@@ -1,0 +1,21 @@
+# Marko Projects — MongoDB edition
+
+The app now stores everything in MongoDB (Supabase has been removed).
+
+## Setup
+1. `cp .env.example .env` and fill in `MONGODB_URI`, `MONGODB_DB` and `JWT_SECRET`.
+2. `npm install`
+3. `npm run db:test` — checks the connection.
+4. `npm run db:setup` — creates indexes.
+5. `npm run db:create-admin -- you@example.com "Password" "Your Name"` — creates the first super admin.
+6. `npm run dev`
+
+## How it works
+- **Auth:** email + password. Passwords are hashed with scrypt and stored in `users`. A signed session
+  cookie (httpOnly, 7 days) is set on login; every server function checks it via `src/lib/auth-middleware.ts`.
+- **Permissions:** the old Postgres row-level-security rules are enforced in `src/lib/app.server.ts` and
+  `src/lib/projects.server.ts` (roles are read from the `user_roles` collection).
+- **Collections:** `users`, `profiles`, `user_roles`, `projects`, `project_phases`, `project_members`,
+  `tasks`, `daily_logs`, `activity_log`. Documents keep a UUID in `id`, so exported Supabase rows can be
+  imported as-is. Activity entries (previously DB triggers) are written by the server code.
+- Users created by an admin in **Settings** get an email, password and role; there is no public sign-up.

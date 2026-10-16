@@ -1,0 +1,377 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Keep this file in the same location as your current stylesheet.
+   The @source path above is relative to this file.
+   Load Inter / Plus Jakarta Sans in your app's existing font setup.
+   Screenshot colours are approximated from the supplied image. */
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --shadow-soft: 0 1px 3px rgb(36 46 54 / 0.03);
+  --shadow-card: 0 2px 8px rgb(36 46 54 / 0.025);
+}
+
+:root {
+  --radius: 1rem;
+  --background: #f4f6f5;
+  --foreground: #252c30;
+  --card: #ffffff;
+  --card-foreground: #252c30;
+  --popover: #ffffff;
+  --popover-foreground: #252c30;
+  --primary: #ffd512;
+  --primary-foreground: #202a30;
+  --secondary: #eef1f0;
+  --secondary-foreground: #252c30;
+  --muted: #f4f6f5;
+  --muted-foreground: #7d8b97;
+  --accent: #fff6cc;
+  --accent-foreground: #252c30;
+  --destructive: #ff5148;
+  --destructive-foreground: #ffffff;
+  --success: #199e79;
+  --success-foreground: #ffffff;
+  --warning: #ff9b30;
+  --warning-foreground: #252c30;
+  --info: #4887b9;
+  --info-foreground: #ffffff;
+  --border: #e6eae8;
+  --input: #e6eae8;
+  --ring: #9c7800;
+  --chart-1: #199e79;
+  --chart-2: #ffd512;
+  --chart-3: #ff9b30;
+  --chart-4: #ff5148;
+  --chart-5: #4887b9;
+  --sidebar: #24313b;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffd512;
+  --sidebar-primary-foreground: #202a30;
+  --sidebar-accent: #33434f;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #35434d;
+  --sidebar-ring: #ffd512;
+  --status-live-background: #dcf5eb;
+  --status-live-foreground: #008660;
+  --status-progress-background: #fff6cc;
+  --status-progress-foreground: #806000;
+  --status-maintenance-background: #fff0df;
+  --status-maintenance-foreground: #a75300;
+  --status-overdue-background: #ffe7e5;
+  --status-overdue-foreground: #c83f38;
+}
+
+/* Optional dark mode. Remove the 'dark' class from your app's root
+   to display the light dashboard shown in the screenshot. */
+.dark {
+  --background: #182229;
+  --foreground: #f4f6f5;
+  --card: #24313b;
+  --card-foreground: #f4f6f5;
+  --popover: #24313b;
+  --popover-foreground: #f4f6f5;
+  --primary: #ffd512;
+  --primary-foreground: #202a30;
+  --secondary: #2d3c47;
+  --secondary-foreground: #f4f6f5;
+  --muted: #2a3842;
+  --muted-foreground: #a5b2bb;
+  --accent: #3c3824;
+  --accent-foreground: #ffdf54;
+  --destructive: #ff6b62;
+  --destructive-foreground: #182229;
+  --success: #48c49e;
+  --success-foreground: #182229;
+  --warning: #ffaf54;
+  --warning-foreground: #182229;
+  --info: #75b4e5;
+  --info-foreground: #182229;
+  --border: #374752;
+  --input: #374752;
+  --ring: #ffd512;
+  --sidebar: #1d2932;
+  --sidebar-foreground: #f4f6f5;
+  --sidebar-primary: #ffd512;
+  --sidebar-primary-foreground: #202a30;
+  --sidebar-accent: #33434f;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #374752;
+  --sidebar-ring: #ffd512;
+  --status-live-background: #173e33;
+  --status-live-foreground: #66d7b0;
+  --status-progress-background: #423b1c;
+  --status-progress-foreground: #ffdf54;
+  --status-maintenance-background: #453122;
+  --status-maintenance-foreground: #ffb870;
+  --status-overdue-background: #472c30;
+  --status-overdue-foreground: #ff9a92;
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  html, body { font-family: var(--font-sans); }
+  body {
+    margin: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Optional layout classes: add these to your existing JSX elements.
+   Theme colours above already work with bg-background, bg-card,
+   bg-primary, text-foreground and bg-sidebar Tailwind utilities.
+   Hardcoded colours such as bg-blue-600 must be replaced in JSX. */
+@layer components {
+  .workspace-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    min-height: 6rem;
+    padding: 1.25rem 2rem;
+    border-top: 6px solid var(--primary);
+    background: var(--card);
+    color: var(--card-foreground);
+  }
+  .workspace-brand {
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2vw, 2rem);
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  .workspace-brand-accent { color: var(--primary); }
+  .workspace-search {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: min(100%, 28rem);
+    min-width: 0;
+    padding: 1rem 1.25rem;
+    border: 0;
+    border-radius: 1rem;
+    background: var(--muted);
+    color: var(--foreground);
+  }
+  .workspace-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+  }
+  .workspace-search input::placeholder,
+  input.workspace-search::placeholder { color: var(--muted-foreground); }
+  .workspace-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0.75rem 1.5rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .workspace-button:hover { filter: brightness(0.97); }
+  .workspace-button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .workspace-button:focus-visible,
+  .workspace-nav-item:focus-visible,
+  .workspace-search:focus-within {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+  .workspace-layout {
+    display: grid;
+    grid-template-columns: 17rem minmax(0, 1fr);
+    min-height: calc(100dvh - 6rem);
+  }
+  .workspace-sidebar {
+    padding: 1.5rem 1.25rem;
+    background: var(--sidebar);
+    color: var(--sidebar-foreground);
+  }
+  .workspace-nav-label {
+    margin: 0 0 1.25rem;
+    color: var(--sidebar-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .workspace-nav-group + .workspace-nav-group { margin-top: 2.5rem; }
+  .workspace-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    width: 100%;
+    min-height: 3.25rem;
+    margin-bottom: 0.5rem;
+    padding: 0.875rem 1rem;
+    border: 0;
+    border-radius: 0.875rem;
+    background: transparent;
+    color: var(--sidebar-foreground);
+    text-decoration: none;
+    text-align: left;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .workspace-nav-item:hover {
+    background: var(--sidebar-accent);
+    color: var(--sidebar-accent-foreground);
+  }
+  .workspace-nav-item:is(.active, [aria-current="page"], [data-active="true"]) {
+    background: var(--sidebar-primary);
+    color: var(--sidebar-primary-foreground);
+    font-weight: 600;
+  }
+  .workspace-nav-count {
+    margin-left: auto;
+    color: var(--sidebar-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .workspace-nav-item:is(.active, [aria-current="page"], [data-active="true"]) .workspace-nav-count {
+    color: inherit;
+  }
+  .workspace-main { min-width: 0; padding: 2.5rem; }
+  .workspace-title {
+    margin: 0 0 0.75rem;
+    font-size: clamp(1.75rem, 2.5vw, 2.5rem);
+    font-weight: 750;
+    line-height: 1.2;
+  }
+  .workspace-subtitle { color: var(--muted-foreground); line-height: 1.6; }
+  .workspace-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 2.5rem 0 2rem;
+  }
+  .workspace-card {
+    min-width: 0;
+    padding: 1.5rem;
+    border: 0;
+    border-radius: 1.5rem;
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow: none;
+  }
+  .workspace-stat-label { color: var(--muted-foreground); font-weight: 600; }
+  .workspace-stat-value {
+    margin: 1.25rem 0 0.75rem;
+    font-size: clamp(2rem, 3vw, 3rem);
+    font-weight: 750;
+    line-height: 1.1;
+  }
+  .workspace-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(17rem, 1fr);
+    align-items: start;
+    gap: 1.5rem;
+  }
+  .workspace-section-title { margin: 0 0 1.25rem; font-size: 1.375rem; font-weight: 700; }
+  .workspace-project-list { display: grid; gap: 1rem; }
+  .workspace-progress {
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--muted);
+  }
+  .workspace-progress-fill {
+    height: 100%;
+    width: var(--progress, 0%);
+    border-radius: inherit;
+    background: var(--success);
+  }
+  .workspace-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.375rem 1.25rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .workspace-badge-live { background: var(--status-live-background); color: var(--status-live-foreground); }
+  .workspace-badge-progress { background: var(--status-progress-background); color: var(--status-progress-foreground); }
+  .workspace-badge-maintenance { background: var(--status-maintenance-background); color: var(--status-maintenance-foreground); }
+  .workspace-badge-overdue { background: var(--status-overdue-background); color: var(--status-overdue-foreground); }
+
+  @media (max-width: 1200px) {
+    .workspace-layout { grid-template-columns: 14rem minmax(0, 1fr); }
+    .workspace-main { padding: 1.5rem; }
+    .workspace-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .workspace-columns { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 767px) {
+    .workspace-header { flex-wrap: wrap; gap: 1rem; padding: 1rem; }
+    .workspace-search { order: 3; width: 100%; }
+    .workspace-layout { grid-template-columns: minmax(0, 1fr); min-height: auto; }
+    .workspace-sidebar { padding: 1rem; }
+    .workspace-nav-group + .workspace-nav-group { margin-top: 1.25rem; }
+    .workspace-main { padding: 1.25rem 1rem; }
+    .workspace-stats { margin-top: 1.5rem; }
+    .workspace-card { padding: 1.25rem; border-radius: 1.25rem; }
+  }
+  @media (max-width: 420px) {
+    .workspace-stats { grid-template-columns: minmax(0, 1fr); }
+    .workspace-button { padding-inline: 1rem; }
+  }
+}
