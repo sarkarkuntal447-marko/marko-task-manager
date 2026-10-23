@@ -190,8 +190,9 @@ export async function updateTask(
   const tasks = db.collection<TaskDoc>("tasks");
   const task = await tasks.findOne({ id });
   if (!task) throw new Error("Task not found.");
-  if (task.assigned_to !== context.userId && !(await hasAnyRole(context.userId, STAFF))) {
-    throw new Error("You do not have permission to make this change.");
+  // Only the person who created the task may edit it.
+  if (task.created_by !== context.userId) {
+    throw new Error("Only the person who created this task can edit it.");
   }
   await tasks.updateOne({ id }, { $set: { ...changes, updated_at: now() } });
   if (changes.status && changes.status !== task.status) {
@@ -204,8 +205,9 @@ export async function deleteTask(context: Context, id: string) {
   const db = await getDb();
   const task = await db.collection<TaskDoc>("tasks").findOne({ id });
   if (!task) throw new Error("Task not found.");
-  if (task.created_by !== context.userId && !(await hasAnyRole(context.userId, ADMINS))) {
-    throw new Error("You do not have permission to make this change.");
+  // Only the person who created the task may delete it.
+  if (task.created_by !== context.userId) {
+    throw new Error("Only the person who created this task can delete it.");
   }
   await db.collection<TaskDoc>("tasks").deleteOne({ id });
   await db.collection<DailyLogDoc>("daily_logs").updateMany({ task_id: id }, { $set: { task_id: null } });
@@ -271,7 +273,7 @@ export async function deleteUser(context: Context, targetId: string) {
     throw new Error("Only a super admin can delete an admin or super admin account.");
   }
   if (targetRoles.includes("super_admin") &&
-      (await db.collection<UserRoleDoc>("user_roles").countDocuments({ role: "super_admin" })) <= 1) {
+    (await db.collection<UserRoleDoc>("user_roles").countDocuments({ role: "super_admin" })) <= 1) {
     throw new Error("You cannot delete the last super admin.");
   }
   const profile = await db.collection<ProfileDoc>("profiles").findOne({ id: targetId });

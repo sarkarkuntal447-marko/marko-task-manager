@@ -82,6 +82,27 @@ export async function archiveProject(context: Context, id: string) {
   return { id };
 }
 
+export async function listArchivedProjects(context: Context): Promise<Project[]> {
+  await requireRole(context);
+  const db = await getDb();
+  const docs = await db.collection<Project>("projects").find({ archived_at: { $ne: null } }).sort({ archived_at: -1 }).toArray();
+  return docs.map(plain);
+}
+
+export async function restoreProject(context: Context, id: string) {
+  await requireRole(context);
+  const db = await getDb();
+  const projects = db.collection<Project>("projects");
+  let doc = await projects.findOne({ id, archived_at: { $ne: null } });
+  if (!doc && /^[a-f\d]{24}$/i.test(id)) {
+    doc = await projects.findOne({ _id: new ObjectId(id), archived_at: { $ne: null }, id: { $exists: false } });
+  }
+  if (!doc) throw new Error("Archived project not found.");
+  await projects.updateOne({ _id: doc._id }, { $set: { archived_at: null, updated_at: now() } });
+  await logActivity(context.userId, "project.restored", "project", plain(doc).id, doc.name);
+  return { id };
+}
+
 export async function listProjectPhases(projectId: string): Promise<Phase[]> {
   const db = await getDb(); await projectDoc(db, projectId);
   return (await db.collection<Phase>("project_phases").find({ project_id: projectId }).sort({ position: 1, created_at: 1 }).toArray()).map(plain);
@@ -136,14 +157,18 @@ export async function seedProjectPhases(context: Context, projectId: string) {
   const names = ["Requirement Gathering", "UI/UX Design", "Frontend Development", "Backend Development", "API Integration", "CRM Integration", "Database Setup", "Testing & QA", "Deployment", "Client Review", "Maintenance"];
   const timestamp = now();
   // Deterministic _ids make repeated or concurrent seeding idempotent.
-  await db.collection<Phase & { _id: string }>("project_phases").bulkWrite(names.map((name, position) => ({ updateOne: {
-    filter: { _id: `default:${projectId}:${position}` },
-    update: { $setOnInsert: {
-      id: randomUUID(), project_id: projectId, name, position, completed: false,
-      status: "not_started" as const, assigned_to: null, start_date: null, end_date: null,
-      notes: null, created_at: timestamp, updated_at: timestamp,
-    } }, upsert: true,
-  } })), { ordered: false });
+  await db.collection<Phase & { _id: string }>("project_phases").bulkWrite(names.map((name, position) => ({
+    updateOne: {
+      filter: { _id: `default:${projectId}:${position}` },
+      update: {
+        $setOnInsert: {
+          id: randomUUID(), project_id: projectId, name, position, completed: false,
+          status: "not_started" as const, assigned_to: null, start_date: null, end_date: null,
+          notes: null, created_at: timestamp, updated_at: timestamp,
+        }
+      }, upsert: true,
+    }
+  })), { ordered: false });
   return { count: await phases.countDocuments({ project_id: projectId }) };
 }
 

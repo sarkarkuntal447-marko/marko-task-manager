@@ -55,6 +55,14 @@ export const archiveProject = createServerFn({ method: "POST" })
   .middleware([requireAuth]).inputValidator((data: unknown) => projectId.parse(data))
   .handler(async ({ data, context }) => (await import("./projects.server")).archiveProject(context, data.id));
 
+export const listArchivedProjects = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => (await import("./projects.server")).listArchivedProjects(context));
+
+export const restoreProject = createServerFn({ method: "POST" })
+  .middleware([requireAuth]).inputValidator((data: unknown) => projectId.parse(data))
+  .handler(async ({ data, context }) => (await import("./projects.server")).restoreProject(context, data.id));
+
 export const listProjectPhases = createServerFn({ method: "GET" })
   .middleware([requireAuth]).inputValidator((data: unknown) => relatedId.parse(data))
   .handler(async ({ data }) => (await import("./projects.server")).listProjectPhases(data.projectId));
