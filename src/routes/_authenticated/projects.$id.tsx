@@ -672,8 +672,8 @@ function NewTaskDialog({ projectId, members, phases, onAdded }: { projectId: str
             <div className="space-y-2 col-span-2">
               <Label>Phase</Label>
               <Select value={form.phase_id} onValueChange={(v) => setForm({ ...form, phase_id: v })}>
-                <SelectTrigger><SelectValue placeholder={safePhases.length ? "Select a phase (optional)" : "No phases yet — add them in the Phases tab"} /></SelectTrigger>
-                <SelectContent>{safePhases.map((ph: any) => <SelectItem key={ph.id} value={ph.id}>{ph.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger><SelectValue placeholder={phases.length ? "Select a phase (optional)" : "No phases yet — add them in the Phases tab"} /></SelectTrigger>
+                <SelectContent>{phases.map((ph: any) => <SelectItem key={ph.id} value={ph.id}>{ph.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Due Date</Label><DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} /></div>

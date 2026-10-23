@@ -209,11 +209,11 @@ function LogsPage() {
                         </p>
                         {l.notes && <p className="text-xs text-muted-foreground mt-1">{l.notes}</p>}
                       </div>
-                      <Badge variant="secondary" className={priorityColor(l.priority)}>
-                        {l.priority}
+                      <Badge variant="secondary" className={priorityColor(l.priority ?? "medium")}>
+                        {l.priority ?? "medium"}
                       </Badge>
-                      <Badge variant="secondary" className={statusColor(l.status)}>
-                        {statusLabel(l.status)}
+                      <Badge variant="secondary" className={statusColor(l.status ?? "pending")}>
+                        {statusLabel(l.status ?? "pending")}
                       </Badge>
                     </div>
                   ))}
@@ -312,7 +312,7 @@ function describeActivity(a: ActivityEntry): { icon: ReactNode; text: ReactNode 
         icon: <ShieldCheck className="h-4 w-4" />,
         text: (
           <>
-            <b>{who}</b> assigned role <b>{a.metadata?.role}</b> to <b>{a.entity_name}</b>
+            <b>{who}</b> assigned role <b>{typeof a.metadata?.role === "string" ? a.metadata.role : "unknown role"}</b> to <b>{a.entity_name}</b>
           </>
         ),
       };
@@ -426,7 +426,10 @@ function NewLogDialog({ projects, onAdded }: { projects: ProjectOption[]; onAdde
                 <Label>Priority</Label>
                 <Select
                   value={form.priority}
-                  onValueChange={(v) => setForm({ ...form, priority: v })}
+                  onValueChange={(v) => {
+                    const priority = PRIORITY_VALUES.find((value) => value === v);
+                    if (priority) setForm({ ...form, priority });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -442,7 +445,10 @@ function NewLogDialog({ projects, onAdded }: { projects: ProjectOption[]; onAdde
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                <Select value={form.status} onValueChange={(v) => {
+                  const status = STATUS_VALUES.find((value) => value === v);
+                  if (status) setForm({ ...form, status });
+                }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

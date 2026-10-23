@@ -13,16 +13,32 @@ import {
 import { statusLabel, statusColor, fmtDate } from "@/lib/format";
 import { MetricCardSkeleton, ChartCardSkeleton, ListRowsSkeleton } from "@/components/skeletons";
 
+type DashboardProject = {
+  id: string;
+  name: string;
+  expected_delivery_date?: string | null;
+  progress: number;
+  status: string;
+};
+type DashboardTask = { status: string; priority: string };
+type DashboardProfile = { availability?: string | null };
+type DashboardData = {
+  projects: DashboardProject[];
+  tasks: DashboardTask[];
+  profiles: DashboardProfile[];
+  recent: DashboardProject[];
+};
+
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Marko Projects" }] }),
   component: DashboardPage,
 });
 
 function DashboardPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      const d = await getDashboard();
+      const d = await getDashboard() as Omit<DashboardData, "recent">;
       return { ...d, recent: d.projects.slice(0, 6) };
     },
   });

@@ -170,9 +170,19 @@ function AddUserForm({ canPromoteSuper }: { canPromoteSuper: boolean }) {
 function RoleManager() {
   const qc = useQueryClient();
 
-  const { data: members = [], isLoading } = useQuery({
+  const { data: members = [], isLoading } = useQuery<Array<{
+    id: string;
+    full_name?: string | null;
+    designation?: string | null;
+    roles: Array<{ id: string; role: string }>;
+  }>>({
     queryKey: ["all-members-roles"],
-    queryFn: () => listRoleMembers(),
+    queryFn: async () => await listRoleMembers() as Array<{
+      id: string;
+      full_name?: string | null;
+      designation?: string | null;
+      roles: Array<{ id: string; role: string }>;
+    }>,
   });
 
   const addRole = useMutation({
