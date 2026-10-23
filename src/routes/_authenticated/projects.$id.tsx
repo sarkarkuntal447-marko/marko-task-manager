@@ -31,14 +31,14 @@ export const Route = createFileRoute("/_authenticated/projects/$id")({
 });
 
 const DEFAULT_PHASES = [
-  "Requirement Gathering","UI/UX Design","Frontend Development","Backend Development",
-  "API Integration","CRM Integration","Database Setup","Testing & QA","Deployment",
-  "Client Review","Maintenance",
+  "Requirement Gathering", "UI/UX Design", "Frontend Development", "Backend Development",
+  "API Integration", "CRM Integration", "Database Setup", "Testing & QA", "Deployment",
+  "Client Review", "Maintenance",
 ];
-const TASK_STATUSES = ["pending","in_progress","blocked","testing","completed"];
-const PRIORITIES = ["low","medium","high","critical"];
-const PHASE_STATUSES = ["not_started","in_progress","completed","blocked"];
-const PROJECT_STATUSES = ["planning","requirement_gathering","design","development","api_integration","crm_integration","testing","deployment","client_review","live","in_progress","maintenance","completed","on_hold","cancelled"];
+const TASK_STATUSES = ["pending", "in_progress", "blocked", "testing", "completed"];
+const PRIORITIES = ["low", "medium", "high", "critical"];
+const PHASE_STATUSES = ["not_started", "in_progress", "completed", "blocked"];
+const PROJECT_STATUSES = ["planning", "requirement_gathering", "design", "development", "api_integration", "crm_integration", "testing", "deployment", "client_review", "live", "in_progress", "maintenance", "completed", "on_hold", "cancelled"];
 
 const initialsOf = (name: string) => name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
 
@@ -250,34 +250,34 @@ function ProjectDetail() {
                   const subs: any[] = ph.sub_phases ?? [];
                   return (
                     <div key={ph.id} className="p-3 rounded-lg border border-border hover:bg-accent/40">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <Checkbox className="mt-1 shrink-0" checked={ph.completed} disabled={!canManage || togglePhase.isPending} onCheckedChange={(v) => togglePhase.mutate({ phaseId: ph.id, completed: !!v })} />
-                        <div className="flex-1 min-w-0">
-                          <Link to="/projects/$id/phases/$phaseId" params={{ id, phaseId: ph.id }}
-                            className={`font-medium break-words hover:underline ${ph.completed ? "line-through text-muted-foreground" : ""}`} title="Open phase">{ph.name}
-                            {subs.length > 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">{subs.filter((x) => x.completed).length}/{subs.length} sub-phases</span>}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <Checkbox className="mt-1 shrink-0" checked={ph.completed} disabled={!canManage || togglePhase.isPending} onCheckedChange={(v) => togglePhase.mutate({ phaseId: ph.id, completed: !!v })} />
+                          <div className="flex-1 min-w-0">
+                            <Link to="/projects/$id/phases/$phaseId" params={{ id, phaseId: ph.id }}
+                              className={`font-medium break-words hover:underline ${ph.completed ? "line-through text-muted-foreground" : ""}`} title="Open phase">{ph.name}
+                              {subs.length > 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">{subs.filter((x) => x.completed).length}/{subs.length} sub-phases</span>}
+                            </Link>
+                            <p className="text-xs text-muted-foreground break-words">
+                              {owner?.full_name ?? "Unassigned"} · {fmtDate(ph.start_date)} → {fmtDate(ph.end_date)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
+                          <Badge variant="secondary" className={statusColor(ph.status)}>{statusLabel(ph.status)}</Badge>
+                          <Link to="/projects/$id/phases/$phaseId" params={{ id, phaseId: ph.id }} title="Open phase" className="text-muted-foreground hover:text-foreground">
+                            <ChevronRight className="h-5 w-5" />
                           </Link>
-                          <p className="text-xs text-muted-foreground break-words">
-                            {owner?.full_name ?? "Unassigned"} · {fmtDate(ph.start_date)} → {fmtDate(ph.end_date)}
-                          </p>
+                          {canManage && (
+                            <>
+                              <EditPhaseDialog phase={ph} members={safeMembers} onSaved={() => { qc.invalidateQueries({ queryKey: ["phases", id] }); recomputeProgress(); }} />
+                              <Button variant="ghost" size="icon" onClick={() => deletePhase.mutate(ph.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
-                        <Badge variant="secondary" className={statusColor(ph.status)}>{statusLabel(ph.status)}</Badge>
-                        <Link to="/projects/$id/phases/$phaseId" params={{ id, phaseId: ph.id }} title="Open phase" className="text-muted-foreground hover:text-foreground">
-                          <ChevronRight className="h-5 w-5" />
-                        </Link>
-                        {canManage && (
-                          <>
-                            <EditPhaseDialog phase={ph} members={safeMembers} onSaved={() => { qc.invalidateQueries({ queryKey: ["phases", id] }); recomputeProgress(); }} />
-                            <Button variant="ghost" size="icon" onClick={() => deletePhase.mutate(ph.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
                     </div>
                   );
                 })}
@@ -510,21 +510,25 @@ function EditProjectDialog({ project, onSaved }: { project: any; onSaved: () => 
   const update = (k: string, v: string) => setForm((s) => ({ ...s, [k]: v }));
   const m = useMutation({
     mutationFn: async () => {
-      await updateProject({ data: { id: project.id, changes: {
-        name: form.name,
-        description: form.description || null,
-        client_name: form.client_name || null,
-        client_company: form.client_company || null,
-        client_email: form.client_email || null,
-        client_phone: form.client_phone || null,
-        start_date: form.start_date || null,
-        expected_delivery_date: form.expected_delivery_date || null,
-        actual_delivery_date: form.actual_delivery_date || null,
-        priority: form.priority as any,
-        technology_stack: form.technology_stack
-          ? form.technology_stack.split(",").map((s: string) => s.trim()).filter(Boolean)
-          : null,
-      } } });
+      await updateProject({
+        data: {
+          id: project.id, changes: {
+            name: form.name,
+            description: form.description || null,
+            client_name: form.client_name || null,
+            client_company: form.client_company || null,
+            client_email: form.client_email || null,
+            client_phone: form.client_phone || null,
+            start_date: form.start_date || null,
+            expected_delivery_date: form.expected_delivery_date || null,
+            actual_delivery_date: form.actual_delivery_date || null,
+            priority: form.priority as any,
+            technology_stack: form.technology_stack
+              ? form.technology_stack.split(",").map((s: string) => s.trim()).filter(Boolean)
+              : null,
+          }
+        }
+      });
     },
     onSuccess: () => { toast.success("Project updated"); onSaved(); setOpen(false); },
     onError: (e: any) => toast.error(e.message),
@@ -577,14 +581,18 @@ function AddPhaseDialog({ projectId, members, onAdded }: { projectId: string; me
   const [form, setForm] = useState({ name: "", assigned_to: "", start_date: "", end_date: "", status: "not_started", notes: "" });
   const m = useMutation({
     mutationFn: async () => {
-      await createProjectPhase({ data: { projectId, phase: {
-        name: form.name,
-        assigned_to: form.assigned_to || null,
-        start_date: form.start_date || null,
-        end_date: form.end_date || null,
-        status: form.status as any,
-        notes: form.notes || null,
-      } } });
+      await createProjectPhase({
+        data: {
+          projectId, phase: {
+            name: form.name,
+            assigned_to: form.assigned_to || null,
+            start_date: form.start_date || null,
+            end_date: form.end_date || null,
+            status: form.status as any,
+            notes: form.notes || null,
+          }
+        }
+      });
     },
     onSuccess: () => { toast.success("Phase added"); onAdded(); setOpen(false); setForm({ name: "", assigned_to: "", start_date: "", end_date: "", status: "not_started", notes: "" }); },
     onError: (e: any) => toast.error(e.message),
@@ -627,15 +635,19 @@ function NewTaskDialog({ projectId, members, phases, onAdded }: { projectId: str
   const [form, setForm] = useState({ name: "", description: "", assigned_to: "", phase_id: "", due_date: "", priority: "medium", status: "pending" });
   const m = useMutation({
     mutationFn: async () => {
-      await createProjectTask({ data: { projectId, task: {
-        name: form.name,
-        description: form.description || null,
-        assigned_to: form.assigned_to || null,
-        phase_id: form.phase_id || null,
-        due_date: form.due_date || null,
-        priority: form.priority as any,
-        status: form.status as any,
-      } } });
+      await createProjectTask({
+        data: {
+          projectId, task: {
+            name: form.name,
+            description: form.description || null,
+            assigned_to: form.assigned_to || null,
+            phase_id: form.phase_id || null,
+            due_date: form.due_date || null,
+            priority: form.priority as any,
+            status: form.status as any,
+          }
+        }
+      });
     },
     onSuccess: () => { toast.success("Task created"); onAdded(); setOpen(false); setForm((f) => ({ ...f, name: "", description: "", phase_id: "" })); },
     onError: (e: any) => toast.error(e.message),
@@ -659,8 +671,8 @@ function NewTaskDialog({ projectId, members, phases, onAdded }: { projectId: str
             <div className="space-y-2 col-span-2">
               <Label>Phase</Label>
               <Select value={form.phase_id} onValueChange={(v) => setForm({ ...form, phase_id: v })}>
-                <SelectTrigger><SelectValue placeholder={safePhases.length ? "Select a phase (optional)" : "No phases yet — add them in the Phases tab"} /></SelectTrigger>
-                <SelectContent>{safePhases.map((ph: any) => <SelectItem key={ph.id} value={ph.id}>{ph.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger><SelectValue placeholder={phases.length ? "Select a phase (optional)" : "No phases yet — add them in the Phases tab"} /></SelectTrigger>
+                <SelectContent>{phases.map((ph: any) => <SelectItem key={ph.id} value={ph.id}>{ph.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Due Date</Label><DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} /></div>
@@ -698,14 +710,18 @@ function EditPhaseDialog({ phase, members, onSaved }: { phase: any; members: any
   });
   const m = useMutation({
     mutationFn: async () => {
-      await updateProjectPhase({ data: { projectId: phase.project_id, phaseId: phase.id, changes: {
-        name: form.name,
-        assigned_to: form.assigned_to || null,
-        start_date: form.start_date || null,
-        end_date: form.end_date || null,
-        status: form.status as any,
-        notes: form.notes || null,
-      } } });
+      await updateProjectPhase({
+        data: {
+          projectId: phase.project_id, phaseId: phase.id, changes: {
+            name: form.name,
+            assigned_to: form.assigned_to || null,
+            start_date: form.start_date || null,
+            end_date: form.end_date || null,
+            status: form.status as any,
+            notes: form.notes || null,
+          }
+        }
+      });
     },
     onSuccess: () => { toast.success("Phase updated"); onSaved(); setOpen(false); },
     onError: (e: any) => toast.error(e.message),
@@ -734,7 +750,7 @@ function EditPhaseDialog({ phase, members, onSaved }: { phase: any; members: any
             <Label>Status</Label>
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{["not_started","in_progress","completed","blocked"].map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
+              <SelectContent>{["not_started", "in_progress", "completed", "blocked"].map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2"><Label>Notes</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
