@@ -48,11 +48,11 @@ export function GanttChart({ items, emptyText = "Nothing to show yet." }: { item
   return (
     <div className="space-y-3">
       {dated.length > 0 && (
-        <div className="overflow-x-auto">
-          <div style={{ minWidth: 760 }}>
+        <div className="overflow-x-auto -mx-1 px-1 overscroll-x-contain">
+          <div className="min-w-[520px] sm:min-w-[760px]">
             {/* month scale */}
             <div className="flex border-b border-border">
-              <div className="w-48 shrink-0" />
+              <div className="w-32 sm:w-48 shrink-0" />
               <div className="relative flex-1 h-7">
                 {months.map((m) => (
                   <div key={m.ms} className="absolute top-0 bottom-0 border-l border-border pl-1.5 text-xs text-muted-foreground flex items-center"
@@ -67,7 +67,7 @@ export function GanttChart({ items, emptyText = "Nothing to show yet." }: { item
               const clickable = !!d.onClick;
               return (
                 <div key={d.id} className="flex items-center border-b border-border/60 hover:bg-accent/40">
-                  <div className={`w-48 shrink-0 pr-3 py-2 ${clickable ? "cursor-pointer" : ""}`} onClick={d.onClick}>
+                  <div className={`w-32 sm:w-48 shrink-0 pr-2 sm:pr-3 py-2 ${clickable ? "cursor-pointer" : ""}`} onClick={d.onClick}>
                     <p className="text-sm font-medium truncate" title={d.label}>{d.label}</p>
                     {d.sublabel && <p className="text-xs text-muted-foreground truncate">{d.sublabel}</p>}
                   </div>

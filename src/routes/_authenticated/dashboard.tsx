@@ -72,13 +72,13 @@ function DashboardPage() {
   }));
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Live snapshot of every project, person, and deadline.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Live snapshot of every project, person, and deadline.</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {isLoading ? (
           Array.from({ length: 8 }).map((_, i) => <MetricCardSkeleton key={i} />)
         ) : (
@@ -95,7 +95,7 @@ function DashboardPage() {
         )}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid lg:grid-cols-3 gap-3 sm:gap-4">
         {isLoading ? (
           <>
             <ChartCardSkeleton className="lg:col-span-1" />
@@ -103,15 +103,15 @@ function DashboardPage() {
           </>
         ) : (
           <>
-            <Card className="p-6 lg:col-span-1">
+            <Card className="p-4 sm:p-6 lg:col-span-1">
               <h3 className="font-semibold mb-4">Project Status</h3>
-              <div className="h-64">
+              <div className="h-56 sm:h-64">
                 {pieData.length === 0 ? (
                   <EmptyChart label="No projects yet" />
                 ) : (
                   <ResponsiveContainer>
                     <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={85} paddingAngle={2}>
+                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={2}>
                         {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                       </Pie>
                       <Tooltip />
@@ -121,14 +121,14 @@ function DashboardPage() {
               </div>
             </Card>
 
-            <Card className="p-6 lg:col-span-2">
+            <Card className="p-4 sm:p-6 lg:col-span-2">
               <h3 className="font-semibold mb-4">Tasks by Priority</h3>
-              <div className="h-64">
+              <div className="h-56 sm:h-64">
                 <ResponsiveContainer>
-                  <BarChart data={taskByPriority}>
+                  <BarChart data={taskByPriority} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="priority" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <XAxis dataKey="priority" stroke="hsl(var(--muted-foreground))" fontSize={12} interval={0} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} width={40} />
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="Pending" fill="hsl(259 70% 60%)" radius={[6, 6, 0, 0]} />
@@ -141,7 +141,7 @@ function DashboardPage() {
         )}
       </div>
 
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <h3 className="font-semibold mb-4">Recent Projects</h3>
         {isLoading ? (
           <ListRowsSkeleton rows={4} />
@@ -150,18 +150,18 @@ function DashboardPage() {
         ) : (
           <div className="divide-y divide-border">
             {data?.recent.map((p) => (
-              <div key={p.id} className="py-3 flex items-center gap-4">
+              <div key={p.id} className="py-3 flex items-center gap-3 sm:gap-4">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{p.name}</p>
                   <p className="text-xs text-muted-foreground truncate">Due {fmtDate(p.expected_delivery_date)}</p>
                 </div>
-                <div className="w-32 hidden md:block">
+                <div className="w-24 sm:w-32 hidden sm:block shrink-0">
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div className="h-full bg-primary" style={{ width: `${p.progress}%` }} />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{p.progress}%</p>
                 </div>
-                <Badge variant="secondary" className={statusColor(p.status)}>{statusLabel(p.status)}</Badge>
+                <Badge variant="secondary" className={`${statusColor(p.status)} shrink-0`}>{statusLabel(p.status)}</Badge>
               </div>
             ))}
           </div>
@@ -183,14 +183,14 @@ function Metric({ icon: Icon, label, value, sub, tone }: {
     muted: "bg-muted text-muted-foreground",
   };
   return (
-    <Card className="p-4">
+    <Card className="p-3 sm:p-4 min-w-0">
       <div className="flex items-center gap-3">
-        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${toneClass[tone]}`}>
-          <Icon className="h-5 w-5" />
+        <div className={`h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-lg flex items-center justify-center ${toneClass[tone]}`}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
-          <p className="text-2xl font-bold leading-none mt-1">{value}</p>
+        <div className="min-w-0">
+          <p className="text-[11px] sm:text-xs text-muted-foreground uppercase tracking-wide truncate" title={label}>{label}</p>
+          <p className="text-xl sm:text-2xl font-bold leading-none mt-1">{value}</p>
           {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
         </div>
       </div>

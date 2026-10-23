@@ -65,21 +65,21 @@ function ProjectsPage() {
     .filter((p) => !ql || `${p.name} ${p.description ?? ""} ${p.client_name ?? ""} ${p.client_company ?? ""}`.toLowerCase().includes(ql));
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold">Projects</h1>
-          <p className="text-muted-foreground">All client projects, phases, and progress.</p>
+    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Projects</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">All client projects, phases, and progress.</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:justify-end [&>button]:w-full sm:[&>button]:w-auto [&>button:nth-child(3):last-child]:col-span-2">
           <Input
             placeholder="Search projects…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-full sm:w-64"
+            className="col-span-2 w-full sm:w-64"
           />
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="col-span-2 w-full sm:w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               {STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
@@ -105,7 +105,7 @@ function ProjectsPage() {
       {isLoading ? (
         <ProjectsListSkeleton />
       ) : filtered.length === 0 ? (
-        <Card className="p-12 text-center">
+        <Card className="p-8 sm:p-12 text-center">
           <FolderKanban className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
           <h3 className="font-semibold">No projects yet</h3>
           <p className="text-sm text-muted-foreground">
@@ -114,7 +114,7 @@ function ProjectsPage() {
         </Card>
       ) : (
         <>
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             <h2 className="font-semibold mb-4">Project Timeline</h2>
             <GanttChart
               items={filtered.map((p: any) => ({
@@ -125,16 +125,45 @@ function ProjectsPage() {
               }))}
             />
           </Card>
-          <Card className="overflow-hidden">
+          {/* Phones: stacked cards (a 7-column table doesn't fit). */}
+          <div className="space-y-3 sm:hidden">
+            {filtered.map((p) => (
+              <Link key={p.id} to="/projects/$id" params={{ id: p.id }} className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Card className="p-4 space-y-3 active:bg-accent/40 transition-colors">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium break-words">{p.name}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2 break-words">{p.description || "No description"}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary" className={statusColor(p.status)}>{statusLabel(p.status)}</Badge>
+                    <Badge variant="secondary" className={priorityColor(p.priority)}>{p.priority}</Badge>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs text-muted-foreground mb-1 gap-2">
+                      <span className="truncate">Due {fmtDate(p.expected_delivery_date)}{p.client_name ? ` · ${p.client_name}` : ""}</span>
+                      <span className="shrink-0">{p.progress}%</span>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary" style={{ width: `${p.progress}%` }} />
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+          <Card className="overflow-hidden hidden sm:block">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Project</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Priority</TableHead>
-                  <TableHead className="hidden sm:table-cell">Progress</TableHead>
-                  <TableHead className="hidden md:table-cell">Due Date</TableHead>
-                  <TableHead className="hidden lg:table-cell">Client</TableHead>
+                  <TableHead className="hidden md:table-cell">Progress</TableHead>
+                  <TableHead className="hidden lg:table-cell">Due Date</TableHead>
+                  <TableHead className="hidden xl:table-cell">Client</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -157,7 +186,7 @@ function ProjectsPage() {
                     <TableCell>
                       <Badge variant="secondary" className={priorityColor(p.priority)}>{p.priority}</Badge>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
+                    <TableCell className="hidden md:table-cell">
                       <div className="w-full max-w-[140px]">
                         <div className="flex justify-between text-xs text-muted-foreground mb-1">
                           <span>{p.progress}%</span>
@@ -167,10 +196,10 @@ function ProjectsPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+                    <TableCell className="hidden lg:table-cell text-muted-foreground text-sm whitespace-nowrap">
                       {fmtDate(p.expected_delivery_date)}
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+                    <TableCell className="hidden xl:table-cell text-muted-foreground text-sm">
                       {p.client_name || "—"}
                     </TableCell>
                     <TableCell>

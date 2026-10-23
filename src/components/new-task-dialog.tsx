@@ -55,7 +55,7 @@ export function NewTaskDialog({ projects, onAdded }: { projects: any[]; onAdded:
         <div className="space-y-3">
           <div className="space-y-2"><Label>Task *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
           <div className="space-y-2"><Label>Description</Label><Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Project</Label>
               <Select value={form.project_id} onValueChange={(v) => setForm({ ...form, project_id: v, phase_id: "" })}>
@@ -74,7 +74,7 @@ export function NewTaskDialog({ projects, onAdded }: { projects: any[]; onAdded:
             </div>
           </div>
           <div className="space-y-2"><Label>Due</Label><DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Priority</Label>
               <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>

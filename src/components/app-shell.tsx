@@ -2,7 +2,7 @@ import { type ReactNode, useState } from "react";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, FolderKanban, ListTodo, Users, ClipboardList,
-  Settings, LogOut, Compass, Bell, Menu,
+  Settings, LogOut, Bell, Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,11 @@ import { logout, listActivity } from "@/lib/app.functions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const nav = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/projects", label: "Projects", icon: FolderKanban },
-  { to: "/tasks", label: "Tasks", icon: ListTodo },
-  { to: "/logs", label: "Daily Logs", icon: ClipboardList },
-  { to: "/team", label: "Team", icon: Users },
+  { to: "/dashboard", label: "Dashboard", short: "Home", icon: LayoutDashboard },
+  { to: "/projects", label: "Projects", short: "Projects", icon: FolderKanban },
+  { to: "/tasks", label: "Tasks", short: "Tasks", icon: ListTodo },
+  { to: "/logs", label: "Daily Logs", short: "Logs", icon: ClipboardList },
+  { to: "/team", label: "Team", short: "Team", icon: Users },
 ] as const;
 
 const roleLabel: Record<string, string> = {
@@ -28,26 +28,31 @@ const roleLabel: Record<string, string> = {
   developer: "Developer",
 };
 
-function NavList({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+const isActive = (pathname: string, to: string) => pathname === to || pathname.startsWith(to + "/");
+
+// `rail` = the desktop sidebar. On tablets (md) it shrinks to an icon-only rail; on lg+ it shows labels.
+function NavList({ pathname, onNavigate, rail }: { pathname: string; onNavigate?: () => void; rail?: boolean }) {
   return (
-    <nav className="flex-1 p-3 space-y-1">
+    <nav className="flex-1 overflow-y-auto p-3 space-y-1">
       {nav.map((item) => {
-        const active = pathname === item.to || pathname.startsWith(item.to + "/");
+        const active = isActive(pathname, item.to);
         const Icon = item.icon;
         return (
           <Link
             key={item.to}
             to={item.to}
             onClick={onNavigate}
+            title={item.label}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+              rail && "md:max-lg:justify-center md:max-lg:px-0",
               active
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
             )}
           >
-            <Icon className="h-4 w-4" />
-            {item.label}
+            <Icon className={cn("h-4 w-4 shrink-0", rail && "md:max-lg:h-5 md:max-lg:w-5")} />
+            <span className={cn(rail && "md:max-lg:sr-only")}>{item.label}</span>
           </Link>
         );
       })}
@@ -56,40 +61,81 @@ function NavList({ pathname, onNavigate }: { pathname: string; onNavigate?: () =
 }
 
 function SidebarBody({
-  pathname, me, initials, signOut, onNavigate,
+  pathname, me, initials, signOut, onNavigate, rail,
 }: {
-  pathname: string; me: any; initials: string; signOut: () => void; onNavigate?: () => void;
+  pathname: string; me: any; initials: string; signOut: () => void; onNavigate?: () => void; rail?: boolean;
 }) {
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="h-16 flex items-center gap-2 px-5 border-b border-sidebar-border font-display font-bold text-lg">
+      <div className={cn(
+        "h-16 shrink-0 flex items-center gap-2 px-5 border-b border-sidebar-border font-display font-bold text-lg",
+        rail && "md:max-lg:justify-center md:max-lg:px-0",
+      )}>
         <img
-          src="/public/favicon.ico"
+          src="/favicon.ico"
           alt="Marko & Brando"
           className="h-10 w-10 shrink-0 rounded-full object-contain"
-        /> 
-        <span>Marko Projects</span>
+        />
+        <span className={cn("truncate", rail && "md:max-lg:hidden")}>Marko Projects</span>
       </div>
-      <NavList pathname={pathname} onNavigate={onNavigate} />
-      <div className="p-3 border-t border-sidebar-border">
-        <Link to="/settings" onClick={onNavigate} className="flex items-center gap-3 p-2 rounded-lg hover:bg-sidebar-accent/60">
-          <Avatar className="h-9 w-9">
+      <NavList pathname={pathname} onNavigate={onNavigate} rail={rail} />
+      <div className="p-3 border-t border-sidebar-border pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <Link
+          to="/settings"
+          onClick={onNavigate}
+          title="Settings"
+          className={cn(
+            "flex items-center gap-3 p-2 rounded-lg hover:bg-sidebar-accent/60",
+            rail && "md:max-lg:flex-col md:max-lg:gap-1 md:max-lg:px-0",
+          )}
+        >
+          <Avatar className="h-9 w-9 shrink-0">
             <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
               {initials}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1 min-w-0">
+          <div className={cn("flex-1 min-w-0", rail && "md:max-lg:hidden")}>
             <p className="text-sm font-medium truncate">{me?.profile?.full_name ?? me?.user.email}</p>
             <p className="text-xs text-muted-foreground truncate">
               {me?.role ? roleLabel[me.role] : ""}
             </p>
           </div>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.preventDefault(); e.stopPropagation(); signOut(); }} title="Sign out">
+          <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => { e.preventDefault(); e.stopPropagation(); signOut(); }} title="Sign out">
             <LogOut className="h-4 w-4" />
           </Button>
         </Link>
       </div>
     </div>
+  );
+}
+
+/** Phone-only tab bar fixed to the bottom of the screen (app-style navigation for the PWA). */
+function BottomNav({ pathname }: { pathname: string }) {
+  return (
+    <nav className="md:hidden fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]">
+      <div className="grid grid-cols-5">
+        {nav.map((item) => {
+          const active = isActive(pathname, item.to);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1 h-16 text-[11px] font-medium transition-colors",
+                active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-primary text-primary-foreground")}>
+                <Icon className="h-5 w-5" />
+              </span>
+              {item.short}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -111,45 +157,52 @@ export function AppShell({ children }: { children: ReactNode }) {
     .split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen w-full flex bg-background">
-      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-sidebar-border">
-        <SidebarBody pathname={pathname} me={me} initials={initials} signOut={signOut} />
+    <div className="min-h-dvh w-full flex bg-background">
+      <aside className="hidden md:flex md:w-20 lg:w-64 shrink-0 flex-col border-r border-sidebar-border sticky top-0 h-dvh">
+        <SidebarBody pathname={pathname} me={me} initials={initials} signOut={signOut} rail />
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 px-4 md:px-8 border-b border-border bg-card/40 backdrop-blur-sm flex items-center gap-2 sticky top-0 z-10">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" title="Menu">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-72">
-              <SidebarBody
-                pathname={pathname}
-                me={me}
-                initials={initials}
-                signOut={signOut}
-                onNavigate={() => setMobileOpen(false)}
+        <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur-sm pt-[env(safe-area-inset-top)]">
+          <div className="h-14 md:h-16 px-2 sm:px-4 md:px-8 flex items-center gap-1 sm:gap-2">
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden" title="Menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-72 max-w-[85vw]">
+                <SidebarBody
+                  pathname={pathname}
+                  me={me}
+                  initials={initials}
+                  signOut={signOut}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              </SheetContent>
+            </Sheet>
+            <Link to="/dashboard" className="md:hidden font-display font-bold flex items-center gap-2 min-w-0">
+              <img
+                src="/favicon.ico"
+                alt="Marko & Brando"
+                className="h-8 w-8 shrink-0 rounded-full object-contain"
               />
-            </SheetContent>
-          </Sheet>
-          <div className="md:hidden font-display font-bold flex items-center gap-2">
-            <img
-          src="/public/favicon.ico"
-          alt="Marko & Brando"
-          className="h-10 w-10 shrink-0 rounded-full object-contain"
-        /> 
-        <span>Marko Projects</span>
+              <span className="truncate">Marko Projects</span>
+            </Link>
+            <div className="flex-1" />
+            <NotificationsBell userId={me?.user.id} />
+            <Button asChild variant="ghost" size="icon" title="Settings">
+              <Link to="/settings"><Settings className="h-4 w-4" /></Link>
+            </Button>
           </div>
-          <div className="flex-1" />
-          <NotificationsBell userId={me?.user.id} />
-          <Button asChild variant="ghost" size="icon" title="Settings">
-            <Link to="/settings"><Settings className="h-4 w-4" /></Link>
-          </Button>
         </header>
-        <main className="flex-1 p-4 md:p-8 overflow-auto">{children}</main>
+        {/* Bottom padding on phones keeps content clear of the fixed tab bar. */}
+        <main className="flex-1 min-w-0 px-3 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
+          {children}
+        </main>
       </div>
+
+      <BottomNav pathname={pathname} />
     </div>
   );
 }
@@ -197,14 +250,14 @@ function NotificationsBell({ userId }: { userId?: string }) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
+      <PopoverContent align="end" collisionPadding={12} className="w-[calc(100vw-1.5rem)] max-w-80 p-0">
         <div className="p-3 border-b border-border font-semibold text-sm">Recent activity</div>
-        <ul className="max-h-80 overflow-auto">
+        <ul className="max-h-[60dvh] sm:max-h-80 overflow-auto">
           {items.length === 0 ? (
             <li className="p-4 text-sm text-muted-foreground">Nothing yet.</li>
           ) : items.map((a: any) => (
             <li key={a.id} className="p-3 border-b border-border last:border-0 text-sm">
-              <p className="truncate">
+              <p className="line-clamp-2 break-words">
                 <b>{a.actor_name ?? "Someone"}</b>{" "}
                 <span className="text-muted-foreground">{a.action.replace(/[._]/g, " ")}</span>{" "}
                 <b>{a.entity_name}</b>

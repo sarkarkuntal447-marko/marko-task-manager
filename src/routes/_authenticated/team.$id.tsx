@@ -48,13 +48,13 @@ function MemberDetail() {
         <ArrowLeft className="h-4 w-4" /> Back to team
       </Link>
 
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="flex items-center gap-4 flex-wrap">
-          <Avatar className="h-16 w-16">
+          <Avatar className="h-14 w-14 sm:h-16 sm:w-16 shrink-0">
             <AvatarFallback className="bg-primary text-primary-foreground text-lg font-semibold">{initials}</AvatarFallback>
           </Avatar>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold">{display}</h1>
+          <div className="flex-1 min-w-[10rem]">
+            <h1 className="text-xl sm:text-2xl font-bold break-words">{display}</h1>
             <p className="text-sm text-muted-foreground">{member.designation ?? "—"}</p>
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
               {member.department && <span className="inline-flex items-center gap-1"><Briefcase className="h-3 w-3" /> {member.department}</span>}
@@ -69,8 +69,8 @@ function MemberDetail() {
       </Card>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <Card className="p-6 border-primary/40 bg-primary/[0.04]">
-          <div className="flex items-center justify-between mb-3">
+        <Card className="p-4 sm:p-6 border-primary/40 bg-primary/[0.04]">
+          <div className="flex items-center justify-between gap-2 mb-3">
             <h2 className="font-semibold">Today's Tasks · {fmtDate(today)}</h2>
             <Badge variant="secondary">{todaysTasks.length}</Badge>
           </div>
@@ -79,18 +79,18 @@ function MemberDetail() {
             : <div className="space-y-2">{todaysTasks.map((t: any) => <TaskLine key={t.id} t={t} />)}</div>}
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-3">
+        <Card className="p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-2 mb-3">
             <h2 className="font-semibold">Previous Tasks</h2>
             <Badge variant="secondary">{previousTasks.length}</Badge>
           </div>
           {previousTasks.length === 0
             ? <p className="text-sm text-muted-foreground">No prior tasks.</p>
-            : <div className="space-y-2 max-h-96 overflow-auto pr-1">{previousTasks.map((t: any) => <TaskLine key={t.id} t={t} />)}</div>}
+            : <div className="space-y-2 max-h-96 overflow-auto overscroll-contain pr-1">{previousTasks.map((t: any) => <TaskLine key={t.id} t={t} />)}</div>}
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <ProjectList title="Currently working on" icon={<Briefcase className="h-4 w-4" />} projects={working} stoIds={ownsAsSto.map((p: any) => p.id)} />
         <ProjectList title="Maintains" icon={<Wrench className="h-4 w-4" />} projects={maintains} stoIds={ownsAsSto.map((p: any) => p.id)} />
         <ProjectList title="Single-threaded owner" icon={<Crown className="h-4 w-4 text-amber-500" />} projects={ownsAsSto} stoIds={ownsAsSto.map((p: any) => p.id)} />
@@ -101,9 +101,9 @@ function MemberDetail() {
 
 function TaskLine({ t }: { t: any }) {
   return (
-    <div className="p-3 rounded-lg border border-border flex items-center gap-3">
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm">{t.name}</p>
+    <div className="p-3 rounded-lg border border-border flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="flex-1 min-w-[10rem]">
+        <p className="font-medium text-sm break-words">{t.name}</p>
         <p className="text-xs text-muted-foreground">
           {t.projects?.name ?? "—"}{t.due_date && ` · due ${fmtDate(t.due_date)}`}
         </p>
@@ -116,7 +116,7 @@ function TaskLine({ t }: { t: any }) {
 
 function ProjectList({ title, icon, projects, stoIds }: { title: string; icon: React.ReactNode; projects: any[]; stoIds: string[] }) {
   return (
-    <Card className="p-5">
+    <Card className="p-4 sm:p-5">
       <h3 className="font-semibold flex items-center gap-2 mb-3">{icon} {title}</h3>
       {projects.length === 0 ? (
         <p className="text-sm text-muted-foreground">None.</p>

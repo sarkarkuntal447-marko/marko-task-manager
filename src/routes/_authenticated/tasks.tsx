@@ -101,16 +101,16 @@ function TasksPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold">Tasks</h1>
-          <p className="text-muted-foreground">Today's task lists, grouped by team member. History is collapsed below.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between [&>button]:w-full sm:[&>button]:w-auto">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Tasks</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Today's task lists, grouped by team member. History is collapsed below.</p>
         </div>
         {canAdd && <NewTaskDialog projects={projects} onAdded={() => qc.invalidateQueries({ queryKey: ["all-tasks"] })} />}
       </div>
 
-      <Card className="p-6 border-primary/40 bg-primary/[0.04]">
-        <div className="flex items-center justify-between mb-4">
+      <Card className="p-4 sm:p-6 border-primary/40 bg-primary/[0.04]">
+        <div className="flex items-center justify-between gap-2 mb-4">
           <h2 className="font-semibold">Today · {fmtDate(today)}</h2>
           <Badge variant="secondary">{todayGroups.reduce((n, g) => n + g.items.length, 0)} tasks</Badge>
         </div>
@@ -135,8 +135,8 @@ function TasksPage() {
         )}
       </Card>
 
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
+      <Card className="p-4 sm:p-6">
+        <div className="flex items-center justify-between gap-2 mb-4">
           <h2 className="font-semibold">Previous Tasks</h2>
           <Badge variant="secondary">{previousGroups.reduce((n, g) => n + g.items.length, 0)} tasks</Badge>
         </div>
@@ -149,13 +149,13 @@ function TasksPage() {
             {previousGroups.map((g) => (
               <AccordionItem key={g.ownerId} value={g.ownerId}>
                 <AccordionTrigger>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <Avatar className="h-7 w-7">
                       <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                         {g.name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span>{g.name}</span>
+                    <span className="truncate">{g.name}</span>
                     <Badge variant="secondary">{g.items.length}</Badge>
                   </div>
                 </AccordionTrigger>
@@ -185,7 +185,7 @@ function MemberGroup({ name, items, me, canEditAll, onStatus, onDelete }: any) {
         <Avatar className="h-7 w-7">
           <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">{initials}</AvatarFallback>
         </Avatar>
-        <p className="font-medium">{name}</p>
+        <p className="font-medium truncate">{name}</p>
         <Badge variant="secondary">{items.length}</Badge>
       </div>
       <div className="space-y-2">
@@ -219,7 +219,7 @@ function TaskRow({ t, me, canEditAll, onStatus, onDelete }: any) {
         <Badge variant="secondary" className={priorityColor(t.priority)}>{t.priority}</Badge>
         {canEditThis ? (
           <Select value={t.status} onValueChange={onStatus}>
-            <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full min-[400px]:w-36 h-8"><SelectValue /></SelectTrigger>
             <SelectContent>
               {STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
             </SelectContent>
@@ -276,7 +276,7 @@ function EditTaskDialog({ task, onSaved }: { task: any; onSaved: () => void }) {
         <div className="space-y-3">
           <div className="space-y-2"><Label>Task *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
           <div className="space-y-2"><Label>Description</Label><Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2"><Label>Due</Label><DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} /></div>
             <div className="space-y-2">
               <Label>Priority</Label>
@@ -285,7 +285,7 @@ function EditTaskDialog({ task, onSaved }: { task: any; onSaved: () => void }) {
                 <SelectContent>{PRIORITIES.map((p) => <SelectItem key={p} value={p}>{statusLabel(p)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 col-span-2">
+            <div className="space-y-2 sm:col-span-2">
               <Label>Status</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

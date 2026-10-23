@@ -157,8 +157,17 @@
 @layer base {
   * { border-color: var(--border); }
   html, body { font-family: var(--font-sans); }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Removes the double-tap-to-zoom delay on touch devices. */
+  a, button, [role="button"], input, select, textarea, label { touch-action: manipulation; }
   body {
     margin: 0;
+    min-height: 100dvh;
+    overflow-x: hidden;
     background-color: var(--background);
     color: var(--foreground);
     font-feature-settings: "cv11", "ss01";

@@ -47,8 +47,8 @@ function PhasePage() {
 
   const phase: any = phases.find((p: any) => p.id === phaseId);
   const back = (
-    <Link to="/projects/$id" params={{ id }} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-      <ArrowLeft className="h-4 w-4 mr-1" /> Back to {project?.name ?? "project"}
+    <Link to="/projects/$id" params={{ id }} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground max-w-full">
+      <ArrowLeft className="h-4 w-4 mr-1 shrink-0" /> <span className="truncate">Back to {project?.name ?? "project"}</span>
     </Link>
   );
 
@@ -65,18 +65,18 @@ function PhasePage() {
     <div className="space-y-6 max-w-3xl mx-auto">
       {back}
 
-      <Card className="p-6 space-y-4">
+      <Card className="p-4 sm:p-6 space-y-4">
         <div className="flex items-start gap-3">
           <Checkbox className="mt-1.5" checked={!!phase.completed} disabled={!canManage || toggleParent.isPending}
             onCheckedChange={(v) => toggleParent.mutate(!!v)} />
           <div className="flex-1 min-w-0">
-            <h1 className={`text-2xl font-bold break-words ${phase.completed ? "line-through text-muted-foreground" : ""}`}>{phase.name}</h1>
+            <h1 className={`text-xl sm:text-2xl font-bold break-words ${phase.completed ? "line-through text-muted-foreground" : ""}`}>{phase.name}</h1>
             <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap mt-1">
               <Calendar className="h-3.5 w-3.5" /> {fmtDate(phase.start_date)} → {fmtDate(phase.end_date)}
               <span>· {owner?.full_name ?? "Unassigned"}</span>
             </p>
           </div>
-          <Badge variant="secondary" className={statusColor(phase.status)}>{statusLabel(phase.status)}</Badge>
+          <Badge variant="secondary" className={`${statusColor(phase.status)} shrink-0`}>{statusLabel(phase.status)}</Badge>
         </div>
         {phase.notes && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{phase.notes}</p>}
         <div className="space-y-1.5">
@@ -88,7 +88,7 @@ function PhasePage() {
         </div>
       </Card>
 
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <h2 className="font-semibold mb-1">Sub-phases</h2>
         <p className="text-xs text-muted-foreground mb-4">
           When every sub-phase is ticked the phase is marked done automatically, and ticking the phase ticks all of them.

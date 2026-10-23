@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Compass } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — Marko Projects" }] }),
@@ -43,18 +43,18 @@ function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="min-h-dvh grid lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
         <div className="h-16 flex items-center gap-2 px-5 border-b border-sidebar-border font-display font-bold text-lg">
         <img
-          src="/public/favicon.ico"
+          src="/favicon.ico"
           alt="Marko & Brando"
           className="h-10 w-10 shrink-0 rounded-full object-contain"
         /> 
         <span>Marko Projects</span>
       </div>
         <div className="space-y-4 max-w-md">
-          <h1 className="text-4xl font-display font-bold leading-tight">
+          <h1 className="text-3xl xl:text-4xl font-display font-bold leading-tight">
             One command deck for every project, person, and deadline.
           </h1>
           <p className="text-primary-foreground/80">
@@ -65,10 +65,10 @@ function AuthPage() {
         <p className="text-xs text-primary-foreground/60">© Marko Projects · Internal use only</p>
       </div>
 
-      <div className="flex items-center justify-center p-6 bg-background">
-        <Card className="w-full max-w-md p-8 shadow-card border-border/60">
+      <div className="flex items-center justify-center px-4 py-8 sm:p-6 bg-background pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
+        <Card className="w-full max-w-md p-6 sm:p-8 shadow-card border-border/60">
           <div className="lg:hidden flex items-center gap-2 font-display font-bold text-xl mb-6">
-            <Compass className="h-6 w-6 text-primary" /> Marko Projects
+            <img src="/favicon.ico" alt="Marko & Brando" className="h-9 w-9 shrink-0 rounded-full object-contain" /> Marko Projects
           </div>
           <h2 className="text-2xl font-display font-bold">Welcome</h2>
           <p className="text-sm text-muted-foreground mb-6">Sign in to your workspace</p>
@@ -76,11 +76,11 @@ function AuthPage() {
           <form onSubmit={signIn} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input id="email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Sign in

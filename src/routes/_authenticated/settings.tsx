@@ -31,8 +31,8 @@ function SettingsPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Your profile and workspace controls.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">Settings</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Your profile and workspace controls.</p>
       </div>
 
       <ProfileForm />
@@ -89,9 +89,9 @@ function ProfileForm() {
   if (isLoading) return <FormCardSkeleton />;
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 sm:p-6">
       <h2 className="font-semibold mb-1">My Profile</h2>
-      <p className="text-xs text-muted-foreground mb-4">{me?.user.email}</p>
+      <p className="text-xs text-muted-foreground mb-4 break-all">{me?.user.email}</p>
       <div className="grid sm:grid-cols-2 gap-3">
         <div className="space-y-2"><Label>Full name</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
         <div className="space-y-2"><Label>Designation</Label><Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} /></div>
@@ -109,7 +109,7 @@ function ProfileForm() {
         </div>
       </div>
       <div className="flex justify-end mt-4">
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+        <Button className="w-full sm:w-auto" onClick={() => save.mutate()} disabled={save.isPending}>
           <Save className="h-4 w-4 mr-2" /> Save changes
         </Button>
       </div>
@@ -139,7 +139,7 @@ function AddUserForm({ canPromoteSuper }: { canPromoteSuper: boolean }) {
   const allowed = canPromoteSuper ? ROLES : ROLES.filter((r) => r !== "super_admin");
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 sm:p-6">
       <h2 className="font-semibold mb-4 flex items-center gap-2"><UserPlus className="h-4 w-4" /> Add Team Member</h2>
       <div className="grid sm:grid-cols-2 gap-3">
         <div className="space-y-2"><Label>Full name *</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
@@ -157,6 +157,7 @@ function AddUserForm({ canPromoteSuper }: { canPromoteSuper: boolean }) {
       </div>
       <div className="flex justify-end mt-4">
         <Button
+          className="w-full sm:w-auto"
           onClick={() => m.mutate()}
           disabled={m.isPending || !form.email || !form.password || !form.full_name || form.password.length < 6}
         >
@@ -202,14 +203,14 @@ function RoleManager() {
   });
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 sm:p-6">
       <h2 className="font-semibold mb-4 flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Role Management</h2>
       <div className="space-y-3">
         {isLoading && <ListRowsSkeleton rows={3} />}
         {members.map((m: any) => (
           <div key={m.id} className="p-3 border border-border rounded-lg flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-0">
-              <p className="font-medium">{m.full_name ?? "—"}</p>
+              <p className="font-medium break-words">{m.full_name ?? "—"}</p>
               <p className="text-xs text-muted-foreground">{m.designation ?? ""}</p>
             </div>
             <div className="flex flex-wrap gap-1">
@@ -217,14 +218,14 @@ function RoleManager() {
               {m.roles.map((r: any) => (
                 <Badge key={r.id} variant="secondary" className="gap-1">
                   {r.role}
-                  <button onClick={() => removeRole.mutate(r.id)} className="hover:text-destructive">
+                  <button onClick={() => removeRole.mutate(r.id)} className="hover:text-destructive p-0.5 -m-0.5" title="Remove role" aria-label={`Remove ${r.role} role`}>
                     <Trash2 className="h-3 w-3" />
                   </button>
                 </Badge>
               ))}
             </div>
             <Select onValueChange={(v) => addRole.mutate({ userId: m.id, role: v })}>
-              <SelectTrigger className="w-40 h-8"><SelectValue placeholder="Assign role" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-40 h-8"><SelectValue placeholder="Assign role" /></SelectTrigger>
               <SelectContent>
                 {ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
               </SelectContent>

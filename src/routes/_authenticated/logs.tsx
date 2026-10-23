@@ -129,10 +129,10 @@ function LogsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold">Daily Logs</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Daily Logs</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Everything that happens across the workspace, in real time.
           </p>
         </div>
@@ -144,19 +144,19 @@ function LogsPage() {
 
       <Input
         placeholder="Search…"
-        className="max-w-sm"
+        className="w-full sm:max-w-sm"
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
 
       <Tabs defaultValue="activity">
-        <TabsList>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="manual">Manual Logs</TabsTrigger>
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="activity" className="flex-1 sm:flex-none">Activity</TabsTrigger>
+          <TabsTrigger value="manual" className="flex-1 sm:flex-none">Manual Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="activity" className="space-y-2">
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             {activityLoading ? (
               <ListRowsSkeleton rows={5} />
             ) : filteredActivity.length === 0 ? (
@@ -179,7 +179,7 @@ function LogsPage() {
         </TabsContent>
 
         <TabsContent value="manual" className="space-y-2">
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             {logsLoading ? (
               <ListRowsSkeleton rows={5} />
             ) : logs.length === 0 ? (
@@ -197,17 +197,17 @@ function LogsPage() {
                   .map((l) => (
                     <div
                       key={l.id}
-                      className="p-3 rounded-lg border border-border flex flex-wrap items-center gap-3"
+                      className="p-3 rounded-lg border border-border flex flex-wrap items-center gap-2 sm:gap-3"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium">{l.task_name}</p>
+                        <p className="font-medium break-words">{l.task_name}</p>
                         <p className="text-xs text-muted-foreground">
                           {fmtDate(l.log_date)}
                           {l.projects?.name && ` · ${l.projects.name}`}
                           {l.profiles && ` · ${l.profiles.full_name ?? l.profiles.email}`}
                           {l.hours && ` · ${l.hours}h`}
                         </p>
-                        {l.notes && <p className="text-xs text-muted-foreground mt-1">{l.notes}</p>}
+                        {l.notes && <p className="text-xs text-muted-foreground mt-1 break-words whitespace-pre-wrap">{l.notes}</p>}
                       </div>
                       <Badge variant="secondary" className={priorityColor(l.priority ?? "medium")}>
                         {l.priority ?? "medium"}
@@ -241,7 +241,7 @@ function ActivityRow({ a }: { a: ActivityEntry }) {
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm">{text}</p>
+        <p className="text-sm break-words">{text}</p>
         <p className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</p>
       </div>
     </li>
@@ -366,18 +366,18 @@ function NewLogDialog({ projects, onAdded }: { projects: ProjectOption[]; onAdde
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
+      <Button className="w-full sm:w-auto" onClick={() => setOpen(true)}>
         <Plus className="h-4 w-4 mr-2" />
         Log Work
       </Button>
       {open && (
         <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setOpen(false)}
         >
-          <Card className="w-full max-w-lg p-6 space-y-3" onClick={(e) => e.stopPropagation()}>
+          <Card className="w-full max-w-lg max-h-[92dvh] overflow-y-auto p-4 sm:p-6 space-y-3 rounded-b-none sm:rounded-b-xl pb-[max(1rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold">Log Today's Work</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Date</Label>
                 <Input
@@ -421,7 +421,7 @@ function NewLogDialog({ projects, onAdded }: { projects: ProjectOption[]; onAdde
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Priority</Label>
                 <Select
@@ -469,7 +469,7 @@ function NewLogDialog({ projects, onAdded }: { projects: ProjectOption[]; onAdde
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>

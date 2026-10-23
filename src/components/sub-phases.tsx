@@ -53,7 +53,7 @@ export function SubPhases({ projectId, phase, canManage, onChanged, bare }: {
     <div className={bare ? "space-y-2" : "mt-3 ml-7 pl-4 border-l-2 border-border space-y-2"}>
       {subs.length === 0 && <p className="text-sm text-muted-foreground">No sub-phases yet. Add the first one below.</p>}
       {subs.map((s) => (
-        <div key={s.id} className="flex items-center gap-2">
+        <div key={s.id} className="flex items-center gap-2 min-h-9">
           <Checkbox checked={s.completed} disabled={!canManage || toggle.isPending}
             onCheckedChange={(v) => toggle.mutate({ subId: s.id, completed: !!v })} />
           {editing?.id === s.id ? (
@@ -80,7 +80,7 @@ export function SubPhases({ projectId, phase, canManage, onChanged, bare }: {
         </div>
       ))}
       {canManage && (
-        <div className="flex gap-2 pt-1">
+        <div className="flex flex-col min-[400px]:flex-row gap-2 pt-1">
           <Input
             value={text} placeholder="Add sub-phase (press Enter; use commas to add several)"
             onChange={(e) => setText(e.target.value)}
