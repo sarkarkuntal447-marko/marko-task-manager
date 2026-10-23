@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, Briefcase, Calendar, Crown, Wrench } from "lucide-react";
 import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { MemberDetailSkeleton } from "@/components/skeletons";
 
 export const Route = createFileRoute("/_authenticated/team/$id")({
   head: () => ({ meta: [{ title: "Member — Marko Projects" }] }),
@@ -18,7 +19,7 @@ function MemberDetail() {
   const { data: me } = useCurrentUser();
   const isStaff = me?.role === "super_admin" || me?.role === "admin" || me?.role === "moderator";
 
-  const { data: detail } = useQuery({
+  const { data: detail, isLoading } = useQuery({
     queryKey: ["team-member", id],
     queryFn: () => getMember({ data: { id } }),
   });
@@ -27,7 +28,8 @@ function MemberDetail() {
   const projects: any[] = detail?.projects ?? [];
   const memberships: string[] = detail?.memberships ?? [];
 
-  if (!member) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (isLoading) return <MemberDetailSkeleton />;
+  if (!member) return <div className="p-8 text-muted-foreground">Member not found.</div>;
 
   const today = new Date().toISOString().slice(0, 10);
   const todaysTasks = tasks.filter((t: any) => (t.created_at ?? "").slice(0, 10) === today || t.due_date === today);

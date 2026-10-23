@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
 import { NewTaskDialog } from "@/components/new-task-dialog";
 import { GanttChart } from "@/components/gantt-chart";
+import { ProjectsListSkeleton } from "@/components/skeletons";
 import { useCurrentUser, canManageProjects } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/projects/")({
@@ -28,8 +29,8 @@ export const Route = createFileRoute("/_authenticated/projects/")({
   component: ProjectsPage,
 });
 
-const STATUSES = ["planning","requirement_gathering","design","development","api_integration","crm_integration","testing","deployment","client_review","maintenance","completed","on_hold","cancelled"];
-const PRIORITIES = ["low","medium","high","critical"];
+const STATUSES = ["planning", "requirement_gathering", "design", "development", "api_integration", "crm_integration", "testing", "deployment", "client_review", "maintenance", "completed", "on_hold", "cancelled"];
+const PRIORITIES = ["low", "medium", "high", "critical"];
 
 function ProjectsPage() {
   const qc = useQueryClient();
@@ -43,7 +44,7 @@ function ProjectsPage() {
   const [filter, setFilter] = useState<string>("all");
   const [q, setQ] = useState("");
 
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [], isLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: () => listProjects(),
   });
@@ -101,7 +102,9 @@ function ProjectsPage() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <ProjectsListSkeleton />
+      ) : filtered.length === 0 ? (
         <Card className="p-12 text-center">
           <FolderKanban className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
           <h3 className="font-semibold">No projects yet</h3>
@@ -111,73 +114,73 @@ function ProjectsPage() {
         </Card>
       ) : (
         <>
-        <Card className="p-6">
-          <h2 className="font-semibold mb-4">Project Timeline</h2>
-          <GanttChart
-            items={filtered.map((p: any) => ({
-              id: p.id, label: p.name, sublabel: statusLabel(p.status),
-              start: p.start_date, end: p.expected_delivery_date ?? p.actual_delivery_date,
-              progress: p.progress, done: p.status === "completed",
-              onClick: () => navigate({ to: "/projects/$id", params: { id: p.id } }),
-            }))}
-          />
-        </Card>
-        <Card className="overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead className="hidden sm:table-cell">Progress</TableHead>
-                <TableHead className="hidden md:table-cell">Due Date</TableHead>
-                <TableHead className="hidden lg:table-cell">Client</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((p) => (
-                <TableRow
-                  key={p.id}
-                  className="cursor-pointer"
-                  onClick={() => navigate({ to: "/projects/$id", params: { id: p.id } })}
-                >
-                  <TableCell>
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-xs text-muted-foreground line-clamp-1 max-w-xs">
-                      {p.description || "No description"}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={statusColor(p.status)}>{statusLabel(p.status)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={priorityColor(p.priority)}>{p.priority}</Badge>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <div className="w-full max-w-[140px]">
-                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                        <span>{p.progress}%</span>
-                      </div>
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: `${p.progress}%` }} />
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                    {fmtDate(p.expected_delivery_date)}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
-                    {p.client_name || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  </TableCell>
+          <Card className="p-6">
+            <h2 className="font-semibold mb-4">Project Timeline</h2>
+            <GanttChart
+              items={filtered.map((p: any) => ({
+                id: p.id, label: p.name, sublabel: statusLabel(p.status),
+                start: p.start_date, end: p.expected_delivery_date ?? p.actual_delivery_date,
+                progress: p.progress, done: p.status === "completed",
+                onClick: () => navigate({ to: "/projects/$id", params: { id: p.id } }),
+              }))}
+            />
+          </Card>
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead className="hidden sm:table-cell">Progress</TableHead>
+                  <TableHead className="hidden md:table-cell">Due Date</TableHead>
+                  <TableHead className="hidden lg:table-cell">Client</TableHead>
+                  <TableHead className="w-10"></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((p) => (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer"
+                    onClick={() => navigate({ to: "/projects/$id", params: { id: p.id } })}
+                  >
+                    <TableCell>
+                      <div className="font-medium">{p.name}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-1 max-w-xs">
+                        {p.description || "No description"}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={statusColor(p.status)}>{statusLabel(p.status)}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={priorityColor(p.priority)}>{p.priority}</Badge>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <div className="w-full max-w-[140px]">
+                        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                          <span>{p.progress}%</span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-primary" style={{ width: `${p.progress}%` }} />
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+                      {fmtDate(p.expected_delivery_date)}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+                      {p.client_name || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         </>
       )}
     </div>

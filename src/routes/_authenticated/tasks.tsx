@@ -19,6 +19,7 @@ import { NewTaskDialog } from "@/components/new-task-dialog";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { ListRowsSkeleton } from "@/components/skeletons";
 
 export const Route = createFileRoute("/_authenticated/tasks")({
   head: () => ({ meta: [{ title: "Tasks — Marko Projects" }] }),
@@ -36,7 +37,7 @@ function TasksPage() {
   const roles = me?.roles ?? [];
   const canAdd = !!me && (roles.length === 0 || roles.some((r) => r !== "super_admin"));
 
-  const { data: tasks = [] } = useQuery({
+  const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["all-tasks"],
     queryFn: () => listAllTasks(),
   });
@@ -113,7 +114,9 @@ function TasksPage() {
           <h2 className="font-semibold">Today · {fmtDate(today)}</h2>
           <Badge variant="secondary">{todayGroups.reduce((n, g) => n + g.items.length, 0)} tasks</Badge>
         </div>
-        {todayGroups.length === 0 ? (
+        {isLoading ? (
+          <ListRowsSkeleton rows={3} />
+        ) : todayGroups.length === 0 ? (
           <p className="text-sm text-muted-foreground">No tasks logged today yet.</p>
         ) : (
           <div className="space-y-4">
@@ -137,7 +140,9 @@ function TasksPage() {
           <h2 className="font-semibold">Previous Tasks</h2>
           <Badge variant="secondary">{previousGroups.reduce((n, g) => n + g.items.length, 0)} tasks</Badge>
         </div>
-        {previousGroups.length === 0 ? (
+        {isLoading ? (
+          <ListRowsSkeleton rows={3} />
+        ) : previousGroups.length === 0 ? (
           <p className="text-sm text-muted-foreground">No prior tasks.</p>
         ) : (
           <Accordion type="multiple" className="w-full">
@@ -246,13 +251,17 @@ function EditTaskDialog({ task, onSaved }: { task: any; onSaved: () => void }) {
   });
   const m = useMutation({
     mutationFn: async () => {
-      await updateTask({ data: { id: task.id, changes: {
-        name: form.name,
-        description: form.description || null,
-        priority: form.priority as any,
-        status: form.status as any,
-        due_date: form.due_date || null,
-      } } });
+      await updateTask({
+        data: {
+          id: task.id, changes: {
+            name: form.name,
+            description: form.description || null,
+            priority: form.priority as any,
+            status: form.status as any,
+            due_date: form.due_date || null,
+          }
+        }
+      });
     },
     onSuccess: () => { toast.success("Task updated"); onSaved(); setOpen(false); },
     onError: (e: any) => toast.error(e.message),

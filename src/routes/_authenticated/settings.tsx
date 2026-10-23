@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ShieldCheck, Trash2, UserPlus, Save } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useServerFn } from "@tanstack/react-start";
+import { FormCardSkeleton, ListRowsSkeleton } from "@/components/skeletons";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — Marko Projects" }] }),
@@ -44,7 +45,7 @@ function SettingsPage() {
 
 function ProfileForm() {
   const qc = useQueryClient();
-  const { data: me } = useCurrentUser();
+  const { data: me, isLoading } = useCurrentUser();
   const [form, setForm] = useState({
     full_name: "", designation: "", department: "", phone: "",
     joining_date: "", availability: "available" as string,
@@ -66,14 +67,16 @@ function ProfileForm() {
   const save = useMutation({
     mutationFn: async () => {
       if (!me?.user.id) return;
-      await updateMyProfile({ data: {
-        full_name: form.full_name || null,
-        designation: form.designation || null,
-        department: form.department || null,
-        phone: form.phone || null,
-        joining_date: form.joining_date || null,
-        availability: form.availability as any,
-      } });
+      await updateMyProfile({
+        data: {
+          full_name: form.full_name || null,
+          designation: form.designation || null,
+          department: form.department || null,
+          phone: form.phone || null,
+          joining_date: form.joining_date || null,
+          availability: form.availability as any,
+        }
+      });
     },
     onSuccess: () => {
       toast.success("Profile updated");
@@ -82,6 +85,8 @@ function ProfileForm() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  if (isLoading) return <FormCardSkeleton />;
 
   return (
     <Card className="p-6">
@@ -165,7 +170,7 @@ function AddUserForm({ canPromoteSuper }: { canPromoteSuper: boolean }) {
 function RoleManager() {
   const qc = useQueryClient();
 
-  const { data: members = [] } = useQuery({
+  const { data: members = [], isLoading } = useQuery({
     queryKey: ["all-members-roles"],
     queryFn: () => listRoleMembers(),
   });
@@ -190,6 +195,7 @@ function RoleManager() {
     <Card className="p-6">
       <h2 className="font-semibold mb-4 flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Role Management</h2>
       <div className="space-y-3">
+        {isLoading && <ListRowsSkeleton rows={3} />}
         {members.map((m: any) => (
           <div key={m.id} className="p-3 border border-border rounded-lg flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-0">

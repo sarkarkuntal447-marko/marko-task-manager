@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { statusLabel, statusColor, fmtDate } from "@/lib/format";
 import { useCurrentUser, canManageProjects } from "@/hooks/use-current-user";
+import { PhaseDetailSkeleton } from "@/components/skeletons";
 
 export const Route = createFileRoute("/_authenticated/projects/$id_/phases/$phaseId")({
   head: () => ({ meta: [{ title: "Phase — Marko Projects" }] }),
@@ -51,7 +52,7 @@ function PhasePage() {
     </Link>
   );
 
-  if (isLoading) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (isLoading) return <PhaseDetailSkeleton />;
   if (error) return <div className="p-8 text-destructive">{error instanceof Error ? error.message : "Unable to load phase."}</div>;
   if (!phase) return <div className="p-8 space-y-3">{back}<p>Phase not found.</p></div>;
 

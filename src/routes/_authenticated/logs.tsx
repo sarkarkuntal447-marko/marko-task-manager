@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
+import { ListRowsSkeleton } from "@/components/skeletons";
 
 type LogPriority = "low" | "medium" | "high" | "critical";
 type LogStatus = "pending" | "in_progress" | "blocked" | "testing" | "completed";
@@ -83,7 +84,7 @@ function LogsPage() {
     return d.toISOString();
   })();
 
-  const { data: activity = [] } = useQuery<ActivityEntry[]>({
+  const { data: activity = [], isLoading: activityLoading } = useQuery<ActivityEntry[]>({
     queryKey: ["activity-log", showAll],
     queryFn: async () => {
       const result = await listActivity({
@@ -93,7 +94,7 @@ function LogsPage() {
     },
   });
 
-  const { data: logs = [] } = useQuery<DailyLogEntry[]>({
+  const { data: logs = [], isLoading: logsLoading } = useQuery<DailyLogEntry[]>({
     queryKey: ["daily-logs", showAll],
     queryFn: async () => {
       const todayStr = new Date().toISOString().slice(0, 10);
@@ -156,7 +157,9 @@ function LogsPage() {
 
         <TabsContent value="activity" className="space-y-2">
           <Card className="p-6">
-            {filteredActivity.length === 0 ? (
+            {activityLoading ? (
+              <ListRowsSkeleton rows={5} />
+            ) : filteredActivity.length === 0 ? (
               <p className="text-sm text-muted-foreground">No activity yet.</p>
             ) : (
               <ul className="space-y-2">
@@ -177,7 +180,9 @@ function LogsPage() {
 
         <TabsContent value="manual" className="space-y-2">
           <Card className="p-6">
-            {logs.length === 0 ? (
+            {logsLoading ? (
+              <ListRowsSkeleton rows={5} />
+            ) : logs.length === 0 ? (
               <p className="text-sm text-muted-foreground">No manual logs yet.</p>
             ) : (
               <div className="space-y-2">

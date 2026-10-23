@@ -11,6 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
 } from "recharts";
 import { statusLabel, statusColor, fmtDate } from "@/lib/format";
+import { MetricCardSkeleton, ChartCardSkeleton, ListRowsSkeleton } from "@/components/skeletons";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Marko Projects" }] }),
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function DashboardPage() {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
       const d = await getDashboard();
@@ -62,56 +63,73 @@ function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Metric icon={FolderKanban} label="Total Projects" value={total} tone="primary" />
-        <Metric icon={TrendingUp} label="Active" value={active} tone="info" />
-        <Metric icon={CheckCircle2} label="Completed" value={completed} tone="success" />
-        <Metric icon={PauseCircle} label="On Hold" value={onHold} tone="muted" />
-        <Metric icon={AlertTriangle} label="Delayed" value={delayed} tone="warning" />
-        <Metric icon={Users} label="Employees" value={employees} sub={`${activeEmployees} active`} tone="primary" />
-        <Metric icon={ListTodo} label="Pending Tasks" value={pendingTasks} tone="info" />
-        <Metric icon={Clock} label="Completed Tasks" value={completedTasks} tone="success" />
+        {isLoading ? (
+          Array.from({ length: 8 }).map((_, i) => <MetricCardSkeleton key={i} />)
+        ) : (
+          <>
+            <Metric icon={FolderKanban} label="Total Projects" value={total} tone="primary" />
+            <Metric icon={TrendingUp} label="Active" value={active} tone="info" />
+            <Metric icon={CheckCircle2} label="Completed" value={completed} tone="success" />
+            <Metric icon={PauseCircle} label="On Hold" value={onHold} tone="muted" />
+            <Metric icon={AlertTriangle} label="Delayed" value={delayed} tone="warning" />
+            <Metric icon={Users} label="Employees" value={employees} sub={`${activeEmployees} active`} tone="primary" />
+            <Metric icon={ListTodo} label="Pending Tasks" value={pendingTasks} tone="info" />
+            <Metric icon={Clock} label="Completed Tasks" value={completedTasks} tone="success" />
+          </>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
-        <Card className="p-6 lg:col-span-1">
-          <h3 className="font-semibold mb-4">Project Status</h3>
-          <div className="h-64">
-            {pieData.length === 0 ? (
-              <EmptyChart label="No projects yet" />
-            ) : (
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={85} paddingAngle={2}>
-                    {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Card>
+        {isLoading ? (
+          <>
+            <ChartCardSkeleton className="lg:col-span-1" />
+            <ChartCardSkeleton className="lg:col-span-2" />
+          </>
+        ) : (
+          <>
+            <Card className="p-6 lg:col-span-1">
+              <h3 className="font-semibold mb-4">Project Status</h3>
+              <div className="h-64">
+                {pieData.length === 0 ? (
+                  <EmptyChart label="No projects yet" />
+                ) : (
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={85} paddingAngle={2}>
+                        {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </Card>
 
-        <Card className="p-6 lg:col-span-2">
-          <h3 className="font-semibold mb-4">Tasks by Priority</h3>
-          <div className="h-64">
-            <ResponsiveContainer>
-              <BarChart data={taskByPriority}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="priority" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="Pending" fill="hsl(259 70% 60%)" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="Completed" fill="hsl(155 50% 50%)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+            <Card className="p-6 lg:col-span-2">
+              <h3 className="font-semibold mb-4">Tasks by Priority</h3>
+              <div className="h-64">
+                <ResponsiveContainer>
+                  <BarChart data={taskByPriority}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="priority" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="Pending" fill="hsl(259 70% 60%)" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="Completed" fill="hsl(155 50% 50%)" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </>
+        )}
       </div>
 
       <Card className="p-6">
         <h3 className="font-semibold mb-4">Recent Projects</h3>
-        {data?.recent.length === 0 ? (
+        {isLoading ? (
+          <ListRowsSkeleton rows={4} />
+        ) : data?.recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">No projects yet. Create one from the Projects page.</p>
         ) : (
           <div className="divide-y divide-border">

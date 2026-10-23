@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { deleteUser, getTeamWithWorkload } from "@/lib/app.functions";
+import { TeamCardSkeleton } from "@/components/skeletons";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,7 +52,7 @@ function TeamPage() {
     return elevated ? isSuper : true;
   };
 
-  const { data: members = [] } = useQuery({
+  const { data: members = [], isLoading } = useQuery({
     queryKey: ["team-members"],
     queryFn: () => getTeamWithWorkload(),
   });
@@ -64,47 +65,48 @@ function TeamPage() {
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {isLoading && Array.from({ length: 6 }).map((_, i) => <TeamCardSkeleton key={i} />)}
         {members.map((m: any) => {
           const display = m.full_name ?? "Team member";
           const initials = display.split(" ").map((s: string) => s[0]).join("").slice(0, 2).toUpperCase();
           return (
             <div key={m.id} className="relative">
-            {canDelete(m) && (
-              <Button variant="ghost" size="icon" title="Delete account"
-                className="absolute top-2 right-2 z-10 h-8 w-8 text-muted-foreground hover:text-destructive"
-                onClick={() => setTarget(m)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-            <Link
-              to="/team/$id"
-              params={{ id: m.id }}
-              className="block focus:outline-none focus:ring-2 focus:ring-ring rounded-lg"
-            >
-              <Card className="p-5 hover:bg-accent/40 transition-colors cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{display}</p>
-                    <p className="text-xs text-muted-foreground truncate">{m.designation ?? "—"}</p>
+              {canDelete(m) && (
+                <Button variant="ghost" size="icon" title="Delete account"
+                  className="absolute top-2 right-2 z-10 h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => setTarget(m)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+              <Link
+                to="/team/$id"
+                params={{ id: m.id }}
+                className="block focus:outline-none focus:ring-2 focus:ring-ring rounded-lg"
+              >
+                <Card className="p-5 hover:bg-accent/40 transition-colors cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{display}</p>
+                      <p className="text-xs text-muted-foreground truncate">{m.designation ?? "—"}</p>
+                    </div>
+                    <Badge variant="secondary" className={`${availabilityColor[m.availability]} ${canDelete(m) ? "mr-8" : ""}`}>
+                      {m.availability.replace("_", " ")}
+                    </Badge>
                   </div>
-                  <Badge variant="secondary" className={`${availabilityColor[m.availability]} ${canDelete(m) ? "mr-8" : ""}`}>
-                    {m.availability.replace("_", " ")}
-                  </Badge>
-                </div>
-                {m.department && (
-                  <div className="mt-4 space-y-1.5 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2"><Briefcase className="h-3 w-3" /> {m.department}</div>
+                  {m.department && (
+                    <div className="mt-4 space-y-1.5 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2"><Briefcase className="h-3 w-3" /> {m.department}</div>
+                    </div>
+                  )}
+                  <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">{m.activeTasks} active tasks</p>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
-                )}
-                <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">{m.activeTasks} active tasks</p>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </Card>
-            </Link>
+                </Card>
+              </Link>
             </div>
           );
         })}
