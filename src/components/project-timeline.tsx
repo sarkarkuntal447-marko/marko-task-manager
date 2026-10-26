@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { ChevronDown, ChevronRight, Diamond, Check, Sparkles } from "lucide-react";
 import { updateProject, updateProjectPhase } from "@/lib/projects.functions";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { statusLabel, fmtDate } from "@/lib/format";
 
 // ---------- date helpers (days since epoch, UTC, so time zones never shift a date) ----------
@@ -18,8 +17,7 @@ const monthName = (day: number) => new Date(day * 86_400_000).toLocaleDateString
 
 type Zoom = "weeks" | "months" | "quarters";
 const PX: Record<Zoom, number> = { weeks: 28, months: 9, quarters: 3.5 };
-const LEFT = 300;   // width of the name column (desktop)
-const LEFT_MOBILE = 150; // narrower on phones so the bars stay visible
+const LEFT = 300;   // width of the name column
 const ROW = 38;     // row height
 
 type Row = {
@@ -46,7 +44,6 @@ export function ProjectTimeline({ project, phases, tasks, members, canEdit, onOp
   const [drag, setDrag] = useState<null | { key: string; mode: "move" | "start" | "end"; originX: number; s0: number; e0: number; delta: number }>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const px = PX[zoom];
-  const LEFTW = useIsMobile() ? LEFT_MOBILE : LEFT;
   const today = todayDay();
 
   // ---------- build rows: project > phases > (tasks + sub-phases) ----------
@@ -78,7 +75,8 @@ export function ProjectTimeline({ project, phases, tasks, members, canEdit, onOp
       });
       if (collapsed.has(`phase:${ph.id}`)) continue;
       for (const sp of subs) {
-        out.push({ key: `sub:${sp.id}`, kind: "sub", depth: 2, label: sp.name, start: null, end: null, progress: sp.completed ? 100 : 0, status: sp.completed ? "completed" : "pending", done: !!sp.completed, overdue: false, phaseId: ph.id });
+        const ss = sp.start_date ? toDay(sp.start_date) : null, se = sp.end_date ? toDay(sp.end_date) : null;
+        out.push({ key: `sub:${sp.id}`, kind: "sub", depth: 2, label: sp.name, start: ss ?? se, end: se ?? ss, progress: sp.completed ? 100 : 0, status: sp.completed ? "completed" : "pending", done: !!sp.completed, overdue: !sp.completed && se != null && se < today, phaseId: ph.id });
       }
       for (const t of phTasks) {
         const due = t.due_date ? toDay(t.due_date) : null;
@@ -124,9 +122,9 @@ export function ProjectTimeline({ project, phases, tasks, members, canEdit, onOp
 
   const goToday = () => {
     const el = scroller.current; if (!el) return;
-    el.scrollLeft = Math.max(0, LEFTW + x(today) - (el.clientWidth - LEFTW) / 2);
+    el.scrollLeft = Math.max(0, LEFT + x(today) - (el.clientWidth - LEFT) / 2);
   };
-  useEffect(() => { goToday(); /* eslint-disable-next-line */ }, [zoom, LEFTW]);
+  useEffect(() => { goToday(); /* eslint-disable-next-line */ }, [zoom]);
 
   // ---------- saving ----------
   const save = useMutation({
@@ -197,7 +195,7 @@ export function ProjectTimeline({ project, phases, tasks, members, canEdit, onOp
         <div className="inline-flex rounded-md border border-border overflow-hidden">
           {(["weeks", "months", "quarters"] as Zoom[]).map((z) => (
             <button key={z} type="button" onClick={() => setZoom(z)}
-              className={`px-2.5 sm:px-3 py-1.5 text-sm capitalize ${zoom === z ? "bg-primary text-primary-foreground font-medium" : "bg-card hover:bg-accent"}`}>{z}</button>
+              className={`px-3 py-1.5 text-sm capitalize ${zoom === z ? "bg-primary text-primary-foreground font-medium" : "bg-card hover:bg-accent"}`}>{z}</button>
           ))}
         </div>
         <Button variant="outline" size="sm" onClick={goToday}>Today</Button>
@@ -209,14 +207,14 @@ export function ProjectTimeline({ project, phases, tasks, members, canEdit, onOp
             <Sparkles className="h-4 w-4 mr-1.5" />Spread phases evenly
           </Button>
         )}
-        {canEdit && <span className="w-full sm:w-auto text-xs text-muted-foreground sm:ml-auto">Drag a bar to move it, drag its ends to resize. Click an empty row to add dates.</span>}
+        {canEdit && <span className="text-xs text-muted-foreground ml-auto">Drag a bar to move it, drag its ends to resize. Click an empty row to add dates.</span>}
       </div>
 
-      <div ref={scroller} className="relative overflow-auto overscroll-contain rounded-lg border border-border bg-card max-h-[60dvh] sm:max-h-[70vh]">
-        <div style={{ width: LEFTW + W }}>
+      <div ref={scroller} className="relative overflow-auto rounded-lg border border-border bg-card max-h-[70vh]">
+        <div style={{ width: LEFT + W }}>
           {/* header */}
           <div className="sticky top-0 z-30 flex bg-card border-b border-border">
-            <div className="sticky left-0 z-40 bg-card border-r border-border flex items-end px-3 pb-1 text-xs font-medium text-muted-foreground" style={{ width: LEFTW, height: zoom === "quarters" ? 30 : 52 }}>
+            <div className="sticky left-0 z-40 bg-card border-r border-border flex items-end px-3 pb-1 text-xs font-medium text-muted-foreground" style={{ width: LEFT, height: zoom === "quarters" ? 30 : 52 }}>
               Phase / Task
             </div>
             <div className="relative" style={{ width: W, height: zoom === "quarters" ? 30 : 52 }}>
@@ -241,11 +239,11 @@ export function ProjectTimeline({ project, phases, tasks, members, canEdit, onOp
 
           {/* body */}
           <div className="flex">
-            <div className="sticky left-0 z-20 bg-card border-r border-border" style={{ width: LEFTW }}>
+            <div className="sticky left-0 z-20 bg-card border-r border-border" style={{ width: LEFT }}>
               {rows.map((r) => {
                 const open = r.collapsibleKey ? !collapsed.has(r.collapsibleKey) : false;
                 return (
-                  <div key={r.key} className="flex items-center gap-1.5 pr-2 border-b border-border/60 hover:bg-accent/40" style={{ height: ROW, paddingLeft: 6 + r.depth * (LEFTW === LEFT ? 18 : 10) }}>
+                  <div key={r.key} className="flex items-center gap-1.5 pr-2 border-b border-border/60 hover:bg-accent/40" style={{ height: ROW, paddingLeft: 8 + r.depth * 18 }}>
                     {r.collapsibleKey ? (
                       <button type="button" onClick={() => toggle(r.collapsibleKey!)} className="text-muted-foreground hover:text-foreground shrink-0">
                         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -289,9 +287,9 @@ export function ProjectTimeline({ project, phases, tasks, members, canEdit, onOp
                         <Diamond className={`h-4 w-4 ${r.done ? "fill-success text-success" : r.overdue ? "fill-destructive text-destructive" : "fill-primary text-primary-foreground/70"}`} />
                       </div>
                     )}
-                    {hasDates && isBar && (
+                    {hasDates && (isBar || r.kind === "sub") && (
                       <div
-                        className={`absolute top-[7px] rounded-md overflow-hidden group ${c.track} ${draggable ? "cursor-grab active:cursor-grabbing touch-none" : ""} ${r.kind === "project" ? "h-6 ring-1 ring-foreground/20" : "h-6"}`}
+                        className={`absolute top-[7px] rounded-md overflow-hidden group ${c.track} ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${r.kind === "project" ? "h-6 ring-1 ring-foreground/20" : "h-6"}`}
                         style={{ left: x(eff.start!), width: Math.max((eff.end! - eff.start! + 1) * px, 8) }}
                         title={`${r.label}\n${fmtDate(toStr(eff.start!))} → ${fmtDate(toStr(eff.end!))}\n${r.progress}% done${owner ? `\n${owner}` : ""}${r.overdue ? "\nOverdue" : ""}`}
                         onPointerDown={(e) => startDrag(e, r, "move")} onPointerMove={moveDrag} onPointerUp={(e) => endDrag(r, e)} onPointerCancel={() => setDrag(null)}
@@ -302,8 +300,8 @@ export function ProjectTimeline({ project, phases, tasks, members, canEdit, onOp
                         )}
                         {draggable && (
                           <>
-                            <div className="absolute left-0 top-0 bottom-0 w-3 sm:w-2 cursor-ew-resize hover:bg-foreground/20" onPointerDown={(e) => startDrag(e, r, "start")} onPointerMove={moveDrag} onPointerUp={(e) => endDrag(r, e)} />
-                            <div className="absolute right-0 top-0 bottom-0 w-3 sm:w-2 cursor-ew-resize hover:bg-foreground/20" onPointerDown={(e) => startDrag(e, r, "end")} onPointerMove={moveDrag} onPointerUp={(e) => endDrag(r, e)} />
+                            <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-foreground/20" onPointerDown={(e) => startDrag(e, r, "start")} onPointerMove={moveDrag} onPointerUp={(e) => endDrag(r, e)} />
+                            <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-foreground/20" onPointerDown={(e) => startDrag(e, r, "end")} onPointerMove={moveDrag} onPointerUp={(e) => endDrag(r, e)} />
                           </>
                         )}
                       </div>

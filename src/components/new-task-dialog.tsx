@@ -31,17 +31,23 @@ export function NewTaskDialog({ projects, onAdded }: { projects: any[]; onAdded:
     enabled: !!form.project_id && open,
   });
 
+  // A project that already has phases needs one picked; a brand-new project (no phases yet) does not.
+  const phaseRequired = !!form.project_id && phases.length > 0;
+  const canSubmit = !!form.name && !(form.project_id && loadingPhases) && !(phaseRequired && !form.phase_id);
+
   const m = useMutation({
     mutationFn: async () => {
-      await createTask({ data: {
-        name: form.name,
-        description: form.description || null,
-        project_id: form.project_id || null,
-        phase_id: form.phase_id || null,
-        priority: form.priority as any,
-        status: form.status as any,
-        due_date: form.due_date || null,
-      } });
+      await createTask({
+        data: {
+          name: form.name,
+          description: form.description || null,
+          project_id: form.project_id || null,
+          phase_id: form.phase_id || null,
+          priority: form.priority as any,
+          status: form.status as any,
+          due_date: form.due_date || null,
+        }
+      });
     },
     onSuccess: () => { toast.success("Task added"); onAdded(); setOpen(false); reset(); },
     onError: (e: any) => toast.error(e.message),
@@ -55,7 +61,7 @@ export function NewTaskDialog({ projects, onAdded }: { projects: any[]; onAdded:
         <div className="space-y-3">
           <div className="space-y-2"><Label>Task *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
           <div className="space-y-2"><Label>Description</Label><Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Project</Label>
               <Select value={form.project_id} onValueChange={(v) => setForm({ ...form, project_id: v, phase_id: "" })}>
@@ -64,17 +70,17 @@ export function NewTaskDialog({ projects, onAdded }: { projects: any[]; onAdded:
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Phase</Label>
+              <Label>Phase{phaseRequired ? " *" : ""}</Label>
               <Select value={form.phase_id} onValueChange={(v) => setForm({ ...form, phase_id: v })} disabled={!form.project_id}>
                 <SelectTrigger>
-                  <SelectValue placeholder={!form.project_id ? "Select a project first" : loadingPhases ? "Loading…" : phases.length ? "None" : "No phases yet"} />
+                  <SelectValue placeholder={!form.project_id ? "Select a project first" : loadingPhases ? "Loading…" : phases.length ? "Select a phase" : "No phases yet (not required)"} />
                 </SelectTrigger>
                 <SelectContent>{phases.map((ph: any) => <SelectItem key={ph.id} value={ph.id}>{ph.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
           <div className="space-y-2"><Label>Due</Label><DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} /></div>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Priority</Label>
               <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
@@ -91,7 +97,7 @@ export function NewTaskDialog({ projects, onAdded }: { projects: any[]; onAdded:
             </div>
           </div>
         </div>
-        <DialogFooter><Button disabled={!form.name || m.isPending} onClick={() => m.mutate()}>Add Task</Button></DialogFooter>
+        <DialogFooter><Button disabled={!canSubmit || m.isPending} onClick={() => m.mutate()}>Add Task</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );

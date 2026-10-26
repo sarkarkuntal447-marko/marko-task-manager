@@ -22,7 +22,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronRight, ArrowLeft, Plus, Trash2, Calendar, Users, Pencil, Crown, Wrench, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectTimeline } from "@/components/project-timeline";
-import { ProjectDetailSkeleton, ListRowsSkeleton, TimelineSkeleton, MemberChipSkeleton } from "@/components/skeletons";
+import { ProjectDetailSkeleton, ListRowsSkeleton } from "@/components/skeletons";
 import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
 import { useCurrentUser, canManageProjects, canAssignTasks } from "@/hooks/use-current-user";
 
@@ -32,14 +32,14 @@ export const Route = createFileRoute("/_authenticated/projects/$id")({
 });
 
 const DEFAULT_PHASES = [
-  "Requirement Gathering", "UI/UX Design", "Frontend Development", "Backend Development",
-  "API Integration", "CRM Integration", "Database Setup", "Testing & QA", "Deployment",
-  "Client Review", "Maintenance",
+  "Requirement Gathering","UI/UX Design","Frontend Development","Backend Development",
+  "API Integration","CRM Integration","Database Setup","Testing & QA","Deployment",
+  "Client Review","Maintenance",
 ];
-const TASK_STATUSES = ["pending", "in_progress", "blocked", "testing", "completed"];
-const PRIORITIES = ["low", "medium", "high", "critical"];
-const PHASE_STATUSES = ["not_started", "in_progress", "completed", "blocked"];
-const PROJECT_STATUSES = ["planning", "requirement_gathering", "design", "development", "api_integration", "crm_integration", "testing", "deployment", "client_review", "live", "in_progress", "maintenance", "completed", "on_hold", "cancelled"];
+const TASK_STATUSES = ["pending","in_progress","blocked","testing","completed"];
+const PRIORITIES = ["low","medium","high","critical"];
+const PHASE_STATUSES = ["not_started","in_progress","completed","blocked"];
+const PROJECT_STATUSES = ["planning","requirement_gathering","design","development","api_integration","crm_integration","testing","deployment","client_review","live","in_progress","maintenance","completed","on_hold","cancelled"];
 
 const initialsOf = (name: string) => name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
 
@@ -56,22 +56,22 @@ function ProjectDetail() {
     queryFn: () => getProject({ data: { id } }),
   });
 
-  const { data: phases = [], error: phasesError, isLoading: phasesLoading } = useQuery({
+  const { data: phases = [], error: phasesError } = useQuery({
     queryKey: ["phases", id],
     queryFn: () => listProjectPhases({ data: { projectId: id } }),
   });
 
-  const { data: tasks = [], error: tasksError, isLoading: tasksLoading } = useQuery({
+  const { data: tasks = [], error: tasksError } = useQuery({
     queryKey: ["tasks", id],
     queryFn: () => listProjectTasks({ data: { projectId: id } }),
   });
 
-  const { data: members = [], isLoading: membersLoading } = useQuery({
+  const { data: members = [] } = useQuery({
     queryKey: ["members"],
     queryFn: () => getTeamDirectory(),
   });
 
-  const { data: projectMembers = [], error: membersError, isLoading: projectMembersLoading } = useQuery({
+  const { data: projectMembers = [], error: membersError } = useQuery({
     queryKey: ["project-members", id],
     queryFn: () => listProjectMembers({ data: { projectId: id } }),
   });
@@ -150,7 +150,7 @@ function ProjectDetail() {
   const maintainer = safeMembers.find((m: any) => m.id === project.maintainer_id);
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <Link to="/projects" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
         <ArrowLeft className="h-4 w-4" /> Back to projects
       </Link>
@@ -161,17 +161,17 @@ function ProjectDetail() {
             <h1 className="text-2xl sm:text-3xl font-bold break-words min-w-0">{project.name}</h1>
             <Badge variant="secondary" className={priorityColor(project.priority)}>{project.priority}</Badge>
           </div>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1 max-w-3xl break-words">{project.description}</p>
+          <p className="text-muted-foreground mt-1 max-w-3xl break-words">{project.description}</p>
         </div>
-        <div className="grid grid-cols-2 gap-2 empty:hidden sm:flex sm:flex-wrap sm:items-center sm:shrink-0 [&>button]:w-full sm:[&>button]:w-auto">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           {canManage && (
             <>
               <EditProjectDialog project={project} onSaved={() => { qc.invalidateQueries({ queryKey: ["project", id] }); qc.invalidateQueries({ queryKey: ["projects"] }); }} />
-              <Button variant="outline" size="sm" disabled={archive.isPending} onClick={() => {
+              <Button variant="outline" disabled={archive.isPending} onClick={() => {
                 if (window.confirm("Archive this project? It will be hidden from the project list. Its records will be kept.")) archive.mutate();
               }}>Archive Project</Button>
               <Select value={project.status} onValueChange={(v) => updateStatus.mutate(v)}>
-                <SelectTrigger className="col-span-2 w-full sm:w-48"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PROJECT_STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>
@@ -183,31 +183,31 @@ function ProjectDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="p-4 sm:p-5 min-w-0">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-5">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">Progress</p>
-          <p className="text-3xl sm:text-4xl font-bold mt-1">{project.progress}%</p>
+          <p className="text-4xl font-bold mt-1">{project.progress}%</p>
           <div className="h-2 bg-muted rounded-full overflow-hidden mt-3">
             <div className="h-full bg-primary" style={{ width: `${project.progress}%` }} />
           </div>
           <Badge variant="secondary" className={`${statusColor(project.status)} mt-3`}>{statusLabel(project.status)}</Badge>
         </Card>
-        <Card className="p-4 sm:p-5 min-w-0">
+        <Card className="p-5">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">Client</p>
-          <p className="font-semibold mt-1 break-words">{project.client_name ?? "—"}</p>
-          <p className="text-sm text-muted-foreground break-words">{project.client_company ?? ""}</p>
-          <p className="text-xs text-muted-foreground mt-2 break-all">{project.client_email}</p>
-          <p className="text-xs text-muted-foreground break-all">{project.client_phone}</p>
+          <p className="font-semibold mt-1">{project.client_name ?? "—"}</p>
+          <p className="text-sm text-muted-foreground">{project.client_company ?? ""}</p>
+          <p className="text-xs text-muted-foreground mt-2">{project.client_email}</p>
+          <p className="text-xs text-muted-foreground">{project.client_phone}</p>
         </Card>
-        <Card className="p-4 sm:p-5 min-w-0">
+        <Card className="p-5">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">Timeline</p>
-          <div className="space-y-1 mt-2 text-xs sm:text-sm">
-            <div className="flex items-center gap-2"><Calendar className="h-3 w-3 shrink-0 text-muted-foreground" /> Start: {fmtDate(project.start_date)}</div>
-            <div className="flex items-center gap-2"><Calendar className="h-3 w-3 shrink-0 text-muted-foreground" /> Due: {fmtDate(project.expected_delivery_date)}</div>
-            <div className="flex items-center gap-2"><Calendar className="h-3 w-3 shrink-0 text-muted-foreground" /> Delivered: {fmtDate(project.actual_delivery_date)}</div>
+          <div className="space-y-1 mt-2 text-sm">
+            <div className="flex items-center gap-2"><Calendar className="h-3 w-3 text-muted-foreground" /> Start: {fmtDate(project.start_date)}</div>
+            <div className="flex items-center gap-2"><Calendar className="h-3 w-3 text-muted-foreground" /> Due: {fmtDate(project.expected_delivery_date)}</div>
+            <div className="flex items-center gap-2"><Calendar className="h-3 w-3 text-muted-foreground" /> Delivered: {fmtDate(project.actual_delivery_date)}</div>
           </div>
         </Card>
-        <Card className="p-4 sm:p-5 min-w-0">
+        <Card className="p-5">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">Tech Stack</p>
           <div className="flex flex-wrap gap-1.5 mt-2">
             {(project.technology_stack ?? []).length === 0
@@ -222,15 +222,15 @@ function ProjectDetail() {
 
       {(phasesError || tasksError || membersError) && <p className="text-destructive">Some project details could not be loaded. Refresh to try again.</p>}
       <Tabs defaultValue="phases">
-        <TabsList className="w-full sm:w-auto overflow-x-auto justify-start">
-          <TabsTrigger value="phases" className="flex-1 sm:flex-none">Phases</TabsTrigger>
-          <TabsTrigger value="timeline" className="flex-1 sm:flex-none">Timeline</TabsTrigger>
-          <TabsTrigger value="tasks" className="flex-1 sm:flex-none">Tasks</TabsTrigger>
-          <TabsTrigger value="team" className="flex-1 sm:flex-none">Team</TabsTrigger>
+        <TabsList>
+          <TabsTrigger value="phases">Phases</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="team">Team</TabsTrigger>
         </TabsList>
 
         <TabsContent value="phases" className="space-y-4">
-          <Card className="p-4 sm:p-6">
+          <Card className="p-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h3 className="font-semibold">Project Phases</h3>
               {canManage && (
@@ -242,9 +242,7 @@ function ProjectDetail() {
                 </div>
               )}
             </div>
-            {phasesLoading ? (
-              <ListRowsSkeleton rows={5} />
-            ) : safePhases.length === 0 ? (
+            {safePhases.length === 0 ? (
               <p className="text-sm text-muted-foreground">No phases yet.</p>
             ) : (
               <div className="space-y-2">
@@ -253,34 +251,34 @@ function ProjectDetail() {
                   const subs: any[] = ph.sub_phases ?? [];
                   return (
                     <div key={ph.id} className="p-3 rounded-lg border border-border hover:bg-accent/40">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <Checkbox className="mt-1 shrink-0" checked={ph.completed} disabled={!canManage || togglePhase.isPending} onCheckedChange={(v) => togglePhase.mutate({ phaseId: ph.id, completed: !!v })} />
-                          <div className="flex-1 min-w-0">
-                            <Link to="/projects/$id/phases/$phaseId" params={{ id, phaseId: ph.id }}
-                              className={`font-medium break-words hover:underline ${ph.completed ? "line-through text-muted-foreground" : ""}`} title="Open phase">{ph.name}
-                              {subs.length > 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">{subs.filter((x) => x.completed).length}/{subs.length} sub-phases</span>}
-                            </Link>
-                            <p className="text-xs text-muted-foreground break-words">
-                              {owner?.full_name ?? "Unassigned"} · {fmtDate(ph.start_date)} → {fmtDate(ph.end_date)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
-                          <Badge variant="secondary" className={statusColor(ph.status)}>{statusLabel(ph.status)}</Badge>
-                          <Link to="/projects/$id/phases/$phaseId" params={{ id, phaseId: ph.id }} title="Open phase" className="text-muted-foreground hover:text-foreground">
-                            <ChevronRight className="h-5 w-5" />
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <Checkbox className="mt-1 shrink-0" checked={ph.completed} disabled={!canManage || togglePhase.isPending} onCheckedChange={(v) => togglePhase.mutate({ phaseId: ph.id, completed: !!v })} />
+                        <div className="flex-1 min-w-0">
+                          <Link to="/projects/$id/phases/$phaseId" params={{ id, phaseId: ph.id }}
+                            className={`font-medium break-words hover:underline ${ph.completed ? "line-through text-muted-foreground" : ""}`} title="Open phase">{ph.name}
+                            {subs.length > 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">{subs.filter((x) => x.completed).length}/{subs.length} sub-phases</span>}
                           </Link>
-                          {canManage && (
-                            <>
-                              <EditPhaseDialog phase={ph} members={safeMembers} onSaved={() => { qc.invalidateQueries({ queryKey: ["phases", id] }); recomputeProgress(); }} />
-                              <Button variant="ghost" size="icon" onClick={() => deletePhase.mutate(ph.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
+                          <p className="text-xs text-muted-foreground break-words">
+                            {owner?.full_name ?? "Unassigned"} · {fmtDate(ph.start_date)} → {fmtDate(ph.end_date)}
+                          </p>
                         </div>
                       </div>
+                      <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
+                        <Badge variant="secondary" className={statusColor(ph.status)}>{statusLabel(ph.status)}</Badge>
+                        <Link to="/projects/$id/phases/$phaseId" params={{ id, phaseId: ph.id }} title="Open phase" className="text-muted-foreground hover:text-foreground">
+                          <ChevronRight className="h-5 w-5" />
+                        </Link>
+                        {canManage && (
+                          <>
+                            <EditPhaseDialog phase={ph} members={safeMembers} onSaved={() => { qc.invalidateQueries({ queryKey: ["phases", id] }); recomputeProgress(); }} />
+                            <Button variant="ghost" size="icon" onClick={() => deletePhase.mutate(ph.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                     </div>
                   );
                 })}
@@ -291,33 +289,31 @@ function ProjectDetail() {
 
         <TabsContent value="timeline" className="space-y-4">
           <Card className="p-4 sm:p-6">
-            {phasesLoading || tasksLoading ? <TimelineSkeleton /> : <ProjectTimeline
+            <ProjectTimeline
               project={project} phases={safePhases} tasks={safeTasks} members={safeMembers} canEdit={!!canManage}
               onOpenPhase={(phaseId) => navigate({ to: "/projects/$id/phases/$phaseId", params: { id, phaseId } })}
               onChanged={() => { qc.invalidateQueries({ queryKey: ["phases", id] }); qc.invalidateQueries({ queryKey: ["project", id] }); qc.invalidateQueries({ queryKey: ["projects"] }); }}
-            />}
+            />
           </Card>
         </TabsContent>
 
         <TabsContent value="tasks" className="space-y-4">
-          <Card className="p-4 sm:p-6">
+          <Card className="p-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h3 className="font-semibold">Tasks</h3>
               {canAssign && <NewTaskDialog projectId={id} members={safeMembers} phases={safePhases} onAdded={() => qc.invalidateQueries({ queryKey: ["tasks", id] })} />}
             </div>
-            {tasksLoading ? (
-              <ListRowsSkeleton rows={4} />
-            ) : safeTasks.length === 0 ? (
+            {safeTasks.length === 0 ? (
               <p className="text-sm text-muted-foreground">No tasks yet.</p>
             ) : (
               <div className="space-y-2">
                 {safeTasks.map((t) => {
                   const owner = safeMembers.find((m) => m.id === t.assigned_to);
                   return (
-                    <div key={t.id} className="p-3 rounded-lg border border-border flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <div key={t.id} className="p-3 rounded-lg border border-border flex items-center gap-3 flex-wrap">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium break-words">{t.name}</p>
-                        <p className="text-xs text-muted-foreground break-words">{owner?.full_name ?? "Unassigned"}{safePhases.find((ph: any) => ph.id === t.phase_id) ? ` · ${safePhases.find((ph: any) => ph.id === t.phase_id)?.name ?? ""}` : ""} · Due {fmtDate(t.due_date)}</p>
+                        <p className="font-medium">{t.name}</p>
+                        <p className="text-xs text-muted-foreground">{owner?.full_name ?? "Unassigned"}{safePhases.find((ph: any) => ph.id === t.phase_id) ? ` · ${safePhases.find((ph: any) => ph.id === t.phase_id)?.name ?? ""}` : ""} · Due {fmtDate(t.due_date)}</p>
                       </div>
                       <Badge variant="secondary" className={priorityColor(t.priority)}>{t.priority}</Badge>
                       <Badge variant="secondary" className={statusColor(t.status)}>{statusLabel(t.status)}</Badge>
@@ -330,7 +326,7 @@ function ProjectDetail() {
         </TabsContent>
 
         <TabsContent value="team" className="space-y-4">
-          <Card className="p-4 sm:p-6">
+          <Card className="p-6">
             <div className="grid sm:grid-cols-2 gap-4">
               <RoleSlot
                 label="Single-Threaded Owner"
@@ -357,7 +353,7 @@ function ProjectDetail() {
             </div>
           </Card>
 
-          <Card className="p-4 sm:p-6">
+          <Card className="p-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h3 className="font-semibold flex items-center gap-2"><Users className="h-4 w-4" /> Currently Working On</h3>
               {canManage && (
@@ -369,11 +365,7 @@ function ProjectDetail() {
                 />
               )}
             </div>
-            {membersLoading || projectMembersLoading ? (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {Array.from({ length: 3 }).map((_, i) => <MemberChipSkeleton key={i} />)}
-              </div>
-            ) : workingMembers.length === 0 ? (
+            {workingMembers.length === 0 ? (
               <p className="text-sm text-muted-foreground">No team members assigned yet.</p>
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -519,25 +511,21 @@ function EditProjectDialog({ project, onSaved }: { project: any; onSaved: () => 
   const update = (k: string, v: string) => setForm((s) => ({ ...s, [k]: v }));
   const m = useMutation({
     mutationFn: async () => {
-      await updateProject({
-        data: {
-          id: project.id, changes: {
-            name: form.name,
-            description: form.description || null,
-            client_name: form.client_name || null,
-            client_company: form.client_company || null,
-            client_email: form.client_email || null,
-            client_phone: form.client_phone || null,
-            start_date: form.start_date || null,
-            expected_delivery_date: form.expected_delivery_date || null,
-            actual_delivery_date: form.actual_delivery_date || null,
-            priority: form.priority as any,
-            technology_stack: form.technology_stack
-              ? form.technology_stack.split(",").map((s: string) => s.trim()).filter(Boolean)
-              : null,
-          }
-        }
-      });
+      await updateProject({ data: { id: project.id, changes: {
+        name: form.name,
+        description: form.description || null,
+        client_name: form.client_name || null,
+        client_company: form.client_company || null,
+        client_email: form.client_email || null,
+        client_phone: form.client_phone || null,
+        start_date: form.start_date || null,
+        expected_delivery_date: form.expected_delivery_date || null,
+        actual_delivery_date: form.actual_delivery_date || null,
+        priority: form.priority as any,
+        technology_stack: form.technology_stack
+          ? form.technology_stack.split(",").map((s: string) => s.trim()).filter(Boolean)
+          : null,
+      } } });
     },
     onSuccess: () => { toast.success("Project updated"); onSaved(); setOpen(false); },
     onError: (e: any) => toast.error(e.message),
@@ -547,7 +535,7 @@ function EditProjectDialog({ project, onSaved }: { project: any; onSaved: () => 
       <DialogTrigger asChild>
         <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-2" />Edit Project</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2 space-y-2">
@@ -590,18 +578,14 @@ function AddPhaseDialog({ projectId, members, onAdded }: { projectId: string; me
   const [form, setForm] = useState({ name: "", assigned_to: "", start_date: "", end_date: "", status: "not_started", notes: "" });
   const m = useMutation({
     mutationFn: async () => {
-      await createProjectPhase({
-        data: {
-          projectId, phase: {
-            name: form.name,
-            assigned_to: form.assigned_to || null,
-            start_date: form.start_date || null,
-            end_date: form.end_date || null,
-            status: form.status as any,
-            notes: form.notes || null,
-          }
-        }
-      });
+      await createProjectPhase({ data: { projectId, phase: {
+        name: form.name,
+        assigned_to: form.assigned_to || null,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+        status: form.status as any,
+        notes: form.notes || null,
+      } } });
     },
     onSuccess: () => { toast.success("Phase added"); onAdded(); setOpen(false); setForm({ name: "", assigned_to: "", start_date: "", end_date: "", status: "not_started", notes: "" }); },
     onError: (e: any) => toast.error(e.message),
@@ -620,7 +604,7 @@ function AddPhaseDialog({ projectId, members, onAdded }: { projectId: string; me
               <SelectContent>{members.map((m) => <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.email}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2"><Label>Start</Label><DatePicker value={form.start_date} onChange={(v) => setForm({ ...form, start_date: v })} /></div>
             <div className="space-y-2"><Label>End</Label><DatePicker value={form.end_date} onChange={(v) => setForm({ ...form, end_date: v })} /></div>
           </div>
@@ -644,19 +628,15 @@ function NewTaskDialog({ projectId, members, phases, onAdded }: { projectId: str
   const [form, setForm] = useState({ name: "", description: "", assigned_to: "", phase_id: "", due_date: "", priority: "medium", status: "pending" });
   const m = useMutation({
     mutationFn: async () => {
-      await createProjectTask({
-        data: {
-          projectId, task: {
-            name: form.name,
-            description: form.description || null,
-            assigned_to: form.assigned_to || null,
-            phase_id: form.phase_id || null,
-            due_date: form.due_date || null,
-            priority: form.priority as any,
-            status: form.status as any,
-          }
-        }
-      });
+      await createProjectTask({ data: { projectId, task: {
+        name: form.name,
+        description: form.description || null,
+        assigned_to: form.assigned_to || null,
+        phase_id: form.phase_id || null,
+        due_date: form.due_date || null,
+        priority: form.priority as any,
+        status: form.status as any,
+      } } });
     },
     onSuccess: () => { toast.success("Task created"); onAdded(); setOpen(false); setForm((f) => ({ ...f, name: "", description: "", phase_id: "" })); },
     onError: (e: any) => toast.error(e.message),
@@ -669,7 +649,7 @@ function NewTaskDialog({ projectId, members, phases, onAdded }: { projectId: str
         <div className="space-y-3">
           <div className="space-y-2"><Label>Task name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
           <div className="space-y-2"><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Assign to</Label>
               <Select value={form.assigned_to} onValueChange={(v) => setForm({ ...form, assigned_to: v })}>
@@ -677,10 +657,10 @@ function NewTaskDialog({ projectId, members, phases, onAdded }: { projectId: str
                 <SelectContent>{members.map((m) => <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.email}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Phase</Label>
+            <div className="space-y-2 col-span-2">
+              <Label>Phase{phases.length ? " *" : ""}</Label>
               <Select value={form.phase_id} onValueChange={(v) => setForm({ ...form, phase_id: v })}>
-                <SelectTrigger><SelectValue placeholder={phases.length ? "Select a phase (optional)" : "No phases yet — add them in the Phases tab"} /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={phases.length ? "Select a phase" : "No phases yet (not required)"} /></SelectTrigger>
                 <SelectContent>{phases.map((ph: any) => <SelectItem key={ph.id} value={ph.id}>{ph.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -701,7 +681,7 @@ function NewTaskDialog({ projectId, members, phases, onAdded }: { projectId: str
             </div>
           </div>
         </div>
-        <DialogFooter><Button disabled={!form.name || m.isPending} onClick={() => m.mutate()}>Create</Button></DialogFooter>
+        <DialogFooter><Button disabled={!form.name || (phases.length > 0 && !form.phase_id) || m.isPending} onClick={() => m.mutate()}>Create</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -719,18 +699,14 @@ function EditPhaseDialog({ phase, members, onSaved }: { phase: any; members: any
   });
   const m = useMutation({
     mutationFn: async () => {
-      await updateProjectPhase({
-        data: {
-          projectId: phase.project_id, phaseId: phase.id, changes: {
-            name: form.name,
-            assigned_to: form.assigned_to || null,
-            start_date: form.start_date || null,
-            end_date: form.end_date || null,
-            status: form.status as any,
-            notes: form.notes || null,
-          }
-        }
-      });
+      await updateProjectPhase({ data: { projectId: phase.project_id, phaseId: phase.id, changes: {
+        name: form.name,
+        assigned_to: form.assigned_to || null,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+        status: form.status as any,
+        notes: form.notes || null,
+      } } });
     },
     onSuccess: () => { toast.success("Phase updated"); onSaved(); setOpen(false); },
     onError: (e: any) => toast.error(e.message),
@@ -751,7 +727,7 @@ function EditPhaseDialog({ phase, members, onSaved }: { phase: any; members: any
               <SelectContent>{members.map((m) => <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.email}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2"><Label>Start</Label><DatePicker value={form.start_date} onChange={(v) => setForm({ ...form, start_date: v })} /></div>
             <div className="space-y-2"><Label>End</Label><DatePicker value={form.end_date} onChange={(v) => setForm({ ...form, end_date: v })} /></div>
           </div>
@@ -759,7 +735,7 @@ function EditPhaseDialog({ phase, members, onSaved }: { phase: any; members: any
             <Label>Status</Label>
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{["not_started", "in_progress", "completed", "blocked"].map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
+              <SelectContent>{["not_started","in_progress","completed","blocked"].map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2"><Label>Notes</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>

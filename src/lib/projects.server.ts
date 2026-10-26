@@ -180,6 +180,9 @@ export async function listProjectTasks(projectId: string): Promise<Task[]> {
 export async function createProjectTask(context: Context, projectId: string, input: TaskInput) {
   await requireRole(context, STAFF); await checkUserIds([input.assigned_to]);
   const db = await getDb(); await projectDoc(db, projectId);
+  if (!input.phase_id && (await db.collection<Phase>("project_phases").countDocuments({ project_id: projectId })) > 0) {
+    throw new Error("Please select a phase for this project.");
+  }
   if (input.phase_id && !(await db.collection<Phase>("project_phases").findOne({ id: input.phase_id, project_id: projectId }))) {
     throw new Error("Phase not found in this project.");
   }
@@ -230,11 +233,23 @@ async function syncParent(db: Db, projectId: string, phaseId: string) {
   }
 }
 
-export async function addSubPhases(context: Context, projectId: string, phaseId: string, names: string[]) {
+function checkDateRange(start?: string | null, end?: string | null) {
+  // Dates are YYYY-MM-DD, so plain string comparison orders them correctly.
+  if (start && end && end < start) throw new Error("End date cannot be before the start date.");
+}
+
+export async function addSubPhases(
+  context: Context, projectId: string, phaseId: string, names: string[],
+  dates: { start_date?: string | null; end_date?: string | null } = {},
+) {
   await requireRole(context);
   const db = await getDb(); await projectDoc(db, projectId);
+  checkDateRange(dates.start_date, dates.end_date);
   const timestamp = now();
-  const items: SubPhaseDoc[] = names.map(name => ({ id: randomUUID(), name, completed: false, created_at: timestamp }));
+  const items: SubPhaseDoc[] = names.map(name => ({
+    id: randomUUID(), name, completed: false, created_at: timestamp,
+    start_date: dates.start_date ?? null, end_date: dates.end_date ?? null,
+  }));
   const result = await db.collection<Phase>("project_phases").updateOne(
     { id: phaseId, project_id: projectId },
     { $push: { sub_phases: { $each: items } }, $set: { updated_at: timestamp } },
@@ -244,12 +259,23 @@ export async function addSubPhases(context: Context, projectId: string, phaseId:
   return { count: items.length };
 }
 
-export async function updateSubPhase(context: Context, projectId: string, phaseId: string, subId: string, changes: { name?: string; completed?: boolean }) {
+export async function updateSubPhase(context: Context, projectId: string, phaseId: string, subId: string, changes: { name?: string; completed?: boolean; start_date?: string | null; end_date?: string | null }) {
   await requireRole(context);
   const db = await getDb(); await projectDoc(db, projectId);
+  if (changes.start_date !== undefined || changes.end_date !== undefined) {
+    const phase = await db.collection<Phase>("project_phases").findOne({ id: phaseId, project_id: projectId });
+    const sub = phase?.sub_phases?.find(s => s.id === subId);
+    if (!sub) throw new Error("Sub-phase not found.");
+    checkDateRange(
+      changes.start_date !== undefined ? changes.start_date : sub.start_date,
+      changes.end_date !== undefined ? changes.end_date : sub.end_date,
+    );
+  }
   const set: Record<string, unknown> = { updated_at: now() };
   if (changes.name !== undefined) set["sub_phases.$.name"] = changes.name;
   if (changes.completed !== undefined) set["sub_phases.$.completed"] = changes.completed;
+  if (changes.start_date !== undefined) set["sub_phases.$.start_date"] = changes.start_date;
+  if (changes.end_date !== undefined) set["sub_phases.$.end_date"] = changes.end_date;
   const result = await db.collection<Phase>("project_phases").updateOne(
     { id: phaseId, project_id: projectId, "sub_phases.id": subId }, { $set: set },
   );

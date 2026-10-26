@@ -163,6 +163,11 @@ export async function createTask(context: Context, input: NewTask) {
   if (input.project_id && !(await db.collection("projects").findOne({ id: input.project_id, archived_at: null }))) {
     throw new Error("Project not found.");
   }
+  // If the project already has phases, one must be chosen. A new project with no phases needs none.
+  if (input.project_id && !input.phase_id &&
+    (await db.collection("project_phases").countDocuments({ project_id: input.project_id })) > 0) {
+    throw new Error("Please select a phase for this project.");
+  }
   // A phase belongs to a project, so it can only be chosen together with that project.
   if (input.phase_id) {
     if (!input.project_id) throw new Error("Choose a project before choosing a phase.");
@@ -262,7 +267,8 @@ export async function createDailyLog(
 
 // ---------- remove an account ----------
 export async function deleteUser(context: Context, targetId: string) {
-  await requireRole(context);
+  // Only a super admin may delete accounts. Admins cannot.
+  await requireRole(context, ["super_admin"]);
   if (targetId === context.userId) throw new Error("You cannot delete your own account.");
   const db = await getDb();
   const target = await db.collection<UserDoc>("users").findOne({ id: targetId });

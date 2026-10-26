@@ -25,7 +25,10 @@ export interface ProjectDoc {
   notes: string | null; created_by: string | null; lead_id: string | null; maintainer_id: string | null;
   created_at: string; updated_at: string; archived_at?: string | null;
 }
-export interface SubPhaseDoc { id: string; name: string; completed: boolean; created_at: string }
+export interface SubPhaseDoc {
+  id: string; name: string; completed: boolean; created_at: string;
+  start_date?: string | null; end_date?: string | null;
+}
 export interface PhaseDoc {
   sub_phases?: SubPhaseDoc[];
   id: string; project_id: string; name: string; assigned_to: string | null;

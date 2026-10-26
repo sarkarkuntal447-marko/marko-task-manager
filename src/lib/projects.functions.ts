@@ -113,13 +113,16 @@ const subPhaseIds = z.object({ projectId: id, phaseId: id });
 
 export const addSubPhases = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .inputValidator((data: unknown) => subPhaseIds.extend({ names: z.array(z.string().trim().min(1).max(200)).min(1).max(50) }).strict().parse(data))
-  .handler(async ({ data, context }) => (await import("./projects.server")).addSubPhases(context, data.projectId, data.phaseId, data.names));
+  .inputValidator((data: unknown) => subPhaseIds.extend({
+    names: z.array(z.string().trim().min(1).max(200)).min(1).max(50),
+    start_date: date.optional(), end_date: date.optional(),
+  }).strict().parse(data))
+  .handler(async ({ data, context }) => (await import("./projects.server")).addSubPhases(context, data.projectId, data.phaseId, data.names, { start_date: data.start_date, end_date: data.end_date }));
 
 export const updateSubPhase = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((data: unknown) => subPhaseIds.extend({
-    subId: id, changes: z.object({ name: z.string().trim().min(1).max(200), completed: z.boolean() }).partial().strict()
+    subId: id, changes: z.object({ name: z.string().trim().min(1).max(200), completed: z.boolean(), start_date: date, end_date: date }).partial().strict()
       .refine(v => Object.keys(v).length > 0, "No changes supplied"),
   }).strict().parse(data))
   .handler(async ({ data, context }) => (await import("./projects.server")).updateSubPhase(context, data.projectId, data.phaseId, data.subId, data.changes));

@@ -38,9 +38,8 @@ function ProjectsPage() {
   const navigate = useNavigate();
   const { data: me } = useCurrentUser();
   const canManage = canManageProjects(me?.role);
-  // Same rule as the Tasks page: a user whose only role is super_admin cannot add tasks.
-  const roles = me?.roles ?? [];
-  const canAdd = !!me && (roles.length === 0 || roles.some((r) => r !== "super_admin"));
+  // Every signed-in user (including super admin) can add a task.
+  const canAdd = !!me;
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<string>("all");
   const [q, setQ] = useState("");
@@ -82,7 +81,7 @@ function ProjectsPage() {
           <Select value={filter} onValueChange={setFilter}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All status</SelectItem>
+              <SelectItem value="all">All statuses</SelectItem>
               {STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
             </SelectContent>
           </Select>

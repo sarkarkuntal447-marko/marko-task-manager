@@ -29,7 +29,6 @@ const availabilityColor: Record<string, string> = {
 function TeamPage() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
-  const isAdmin = me?.role === "admin" || me?.role === "super_admin";
   const isSuper = me?.roles?.includes("super_admin") ?? false;
   const [target, setTarget] = useState<any | null>(null);
 
@@ -45,12 +44,8 @@ function TeamPage() {
     onError: (e: Error) => { toast.error(e.message); setTarget(null); },
   });
 
-  // Admins may remove developers and moderators; only a super admin may remove admins / super admins. Nobody removes themselves.
-  const canDelete = (m: any) => {
-    if (!isAdmin || m.id === me?.user.id) return false;
-    const elevated = (m.roles ?? []).some((r: string) => r === "admin" || r === "super_admin");
-    return elevated ? isSuper : true;
-  };
+  // Only a super admin can delete accounts (admins cannot). Nobody deletes themselves.
+  const canDelete = (m: any) => isSuper && m.id !== me?.user.id;
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["team-members"],
@@ -60,11 +55,11 @@ function TeamPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Team</h1>
-        <p className="text-sm sm:text-base text-muted-foreground">Click any member to see their details, tasks and projects.</p>
+        <h1 className="text-3xl font-bold">Team</h1>
+        <p className="text-muted-foreground">Click any member to see their details, tasks and projects.</p>
       </div>
 
-      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading && Array.from({ length: 6 }).map((_, i) => <TeamCardSkeleton key={i} />)}
         {members.map((m: any) => {
           const display = m.full_name ?? "Team member";
@@ -83,7 +78,7 @@ function TeamPage() {
                 params={{ id: m.id }}
                 className="block focus:outline-none focus:ring-2 focus:ring-ring rounded-lg"
               >
-                <Card className="p-4 sm:p-5 hover:bg-accent/40 active:bg-accent/40 transition-colors cursor-pointer">
+                <Card className="p-5 hover:bg-accent/40 transition-colors cursor-pointer">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials}</AvatarFallback>
@@ -92,7 +87,7 @@ function TeamPage() {
                       <p className="font-semibold truncate">{display}</p>
                       <p className="text-xs text-muted-foreground truncate">{m.designation ?? "—"}</p>
                     </div>
-                    <Badge variant="secondary" className={`${availabilityColor[m.availability]} shrink-0 ${canDelete(m) ? "mr-8" : ""}`}>
+                    <Badge variant="secondary" className={`${availabilityColor[m.availability]} ${canDelete(m) ? "mr-8" : ""}`}>
                       {m.availability.replace("_", " ")}
                     </Badge>
                   </div>

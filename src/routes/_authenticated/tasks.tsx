@@ -33,9 +33,8 @@ function TasksPage() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
   const canEditAll = me?.role === "super_admin" || me?.role === "admin" || me?.role === "moderator";
-  // Only-super-admin cannot add. Anyone with another role (even alongside super_admin) can.
-  const roles = me?.roles ?? [];
-  const canAdd = !!me && (roles.length === 0 || roles.some((r) => r !== "super_admin"));
+  // Every signed-in user (including super admin) can add a task.
+  const canAdd = !!me;
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["all-tasks"],
@@ -252,17 +251,13 @@ function EditTaskDialog({ task, onSaved }: { task: any; onSaved: () => void }) {
   });
   const m = useMutation({
     mutationFn: async () => {
-      await updateTask({
-        data: {
-          id: task.id, changes: {
-            name: form.name,
-            description: form.description || null,
-            priority: form.priority as any,
-            status: form.status as any,
-            due_date: form.due_date || null,
-          }
-        }
-      });
+      await updateTask({ data: { id: task.id, changes: {
+        name: form.name,
+        description: form.description || null,
+        priority: form.priority as any,
+        status: form.status as any,
+        due_date: form.due_date || null,
+      } } });
     },
     onSuccess: () => { toast.success("Task updated"); onSaved(); setOpen(false); },
     onError: (e: any) => toast.error(e.message),
