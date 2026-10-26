@@ -23,9 +23,11 @@ function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    getSession().then((me) => {
-      if (me) navigate({ to: "/dashboard" });
-    }).catch(() => undefined);
+    getSession()
+      .then((me) => {
+        if (me) navigate({ to: "/dashboard" });
+      })
+      .catch(() => undefined);
   }, [navigate]);
 
   const signIn = async (e: React.FormEvent) => {
@@ -47,20 +49,20 @@ function AuthPage() {
     <div className="min-h-dvh grid lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
         <div className="h-16 flex items-center gap-2 px-5 border-b border-sidebar-border font-display font-bold text-lg">
-        <img
-          src="/favicon.ico"
-          alt="Marko & Brando"
-          className="h-10 w-10 shrink-0 rounded-full object-contain"
-        /> 
-        <span>Marko Projects</span>
-      </div>
+          <img
+            src="/favicon.ico"
+            alt="Marko & Brando"
+            className="h-10 w-10 shrink-0 rounded-full object-contain"
+          />
+          <span>Marko Projects</span>
+        </div>
         <div className="space-y-4 max-w-md">
           <h1 className="text-3xl xl:text-4xl font-display font-bold leading-tight">
             One command deck for every project, person, and deadline.
           </h1>
           <p className="text-primary-foreground/80">
-            Track web builds, CRMs, ERPs and custom software end-to-end. Phases, tasks,
-            credentials, SSL expiries and team workload — all in one place.
+            Track web builds, CRMs, ERPs and custom software end-to-end. Phases, tasks, credentials,
+            SSL expiries and team workload — all in one place.
           </p>
         </div>
         <p className="text-xs text-primary-foreground/60">© Marko Projects · Internal use only</p>
@@ -69,7 +71,12 @@ function AuthPage() {
       <div className="flex items-center justify-center px-4 py-8 sm:p-6 bg-background pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
         <Card className="w-full max-w-md p-6 sm:p-8 shadow-card border-border/60">
           <div className="lg:hidden flex items-center gap-2 font-display font-bold text-xl mb-6">
-            <img src="/favicon.ico" alt="Marko & Brando" className="h-9 w-9 shrink-0 rounded-full object-contain" /> Marko Projects
+            <img
+              src="/favicon.ico"
+              alt="Marko & Brando"
+              className="h-9 w-9 shrink-0 rounded-full object-contain"
+            />{" "}
+            Marko Projects
           </div>
           <h2 className="text-2xl font-display font-bold">Welcome</h2>
           <p className="text-sm text-muted-foreground mb-6">Sign in to your workspace</p>
@@ -77,12 +84,28 @@ function AuthPage() {
           <form onSubmit={signIn} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="pr-10" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10"
+                />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}

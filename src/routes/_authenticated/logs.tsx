@@ -151,8 +151,12 @@ function LogsPage() {
 
       <Tabs defaultValue="activity">
         <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="activity" className="flex-1 sm:flex-none">Activity</TabsTrigger>
-          <TabsTrigger value="manual" className="flex-1 sm:flex-none">Manual Logs</TabsTrigger>
+          <TabsTrigger value="activity" className="flex-1 sm:flex-none">
+            Activity
+          </TabsTrigger>
+          <TabsTrigger value="manual" className="flex-1 sm:flex-none">
+            Manual Logs
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="activity" className="space-y-2">
@@ -207,7 +211,11 @@ function LogsPage() {
                           {l.profiles && ` · ${l.profiles.full_name ?? l.profiles.email}`}
                           {l.hours && ` · ${l.hours}h`}
                         </p>
-                        {l.notes && <p className="text-xs text-muted-foreground mt-1 break-words whitespace-pre-wrap">{l.notes}</p>}
+                        {l.notes && (
+                          <p className="text-xs text-muted-foreground mt-1 break-words whitespace-pre-wrap">
+                            {l.notes}
+                          </p>
+                        )}
                       </div>
                       <Badge variant="secondary" className={priorityColor(l.priority ?? "medium")}>
                         {l.priority ?? "medium"}
@@ -312,7 +320,9 @@ function describeActivity(a: ActivityEntry): { icon: ReactNode; text: ReactNode 
         icon: <ShieldCheck className="h-4 w-4" />,
         text: (
           <>
-            <b>{who}</b> assigned role <b>{typeof a.metadata?.role === "string" ? a.metadata.role : "unknown role"}</b> to <b>{a.entity_name}</b>
+            <b>{who}</b> assigned role{" "}
+            <b>{typeof a.metadata?.role === "string" ? a.metadata.role : "unknown role"}</b> to{" "}
+            <b>{a.entity_name}</b>
           </>
         ),
       };
@@ -375,7 +385,10 @@ function NewLogDialog({ projects, onAdded }: { projects: ProjectOption[]; onAdde
           className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setOpen(false)}
         >
-          <Card className="w-full max-w-lg max-h-[92dvh] overflow-y-auto p-4 sm:p-6 space-y-3 rounded-b-none sm:rounded-b-xl pb-[max(1rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+          <Card
+            className="w-full max-w-lg max-h-[92dvh] overflow-y-auto p-4 sm:p-6 space-y-3 rounded-b-none sm:rounded-b-xl pb-[max(1rem,env(safe-area-inset-bottom))]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-lg font-semibold">Log Today's Work</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -445,10 +458,13 @@ function NewLogDialog({ projects, onAdded }: { projects: ProjectOption[]; onAdde
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={form.status} onValueChange={(v) => {
-                  const status = STATUS_VALUES.find((value) => value === v);
-                  if (status) setForm({ ...form, status });
-                }}>
+                <Select
+                  value={form.status}
+                  onValueChange={(v) => {
+                    const status = STATUS_VALUES.find((value) => value === v);
+                    if (status) setForm({ ...form, status });
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

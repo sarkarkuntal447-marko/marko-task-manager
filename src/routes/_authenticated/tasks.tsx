@@ -9,10 +9,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
 import { NewTaskDialog } from "@/components/new-task-dialog";
@@ -20,11 +38,17 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { ListRowsSkeleton } from "@/components/skeletons";
+import type { Priority, TaskStatus } from "@/lib/types";
+import { getSession } from "@/lib/app.functions";
 
 export const Route = createFileRoute("/_authenticated/tasks")({
   head: () => ({ meta: [{ title: "Tasks — Marko Projects" }] }),
   component: TasksPage,
 });
+
+type Task = Awaited<ReturnType<typeof listAllTasks>>[number];
+type CurrentUser = Awaited<ReturnType<typeof getSession>>;
+type TaskGroup = { name: string; ownerId: string; items: Task[] };
 
 const STATUSES = ["pending", "in_progress", "blocked", "testing", "completed"] as const;
 const PRIORITIES = ["low", "medium", "high", "critical"] as const;
@@ -50,39 +74,46 @@ function TasksPage() {
     queryKey: ["projects-min"],
     queryFn: async () => {
       const data = await listProjects();
-      return data.map((p: any) => ({ id: p.id, name: p.name }));
+      return data.map((p) => ({ id: p.id, name: p.name }));
     },
   });
 
   const updateStatus = useMutation({
     mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
-      await updateTask({ data: { id: taskId, changes: { status: status as any } } });
+      await updateTask({ data: { id: taskId, changes: { status: status as TaskStatus } } });
     },
-    onSuccess: () => { toast.success("Status updated"); qc.invalidateQueries({ queryKey: ["all-tasks"] }); },
-    onError: (e: any) => toast.error(e.message),
+    onSuccess: () => {
+      toast.success("Status updated");
+      qc.invalidateQueries({ queryKey: ["all-tasks"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const removeTask = useMutation({
     mutationFn: async (taskId: string) => {
       await deleteTask({ data: { id: taskId } });
     },
-    onSuccess: () => { toast.success("Task removed"); qc.invalidateQueries({ queryKey: ["all-tasks"] }); },
-    onError: (e: any) => toast.error(e.message),
+    onSuccess: () => {
+      toast.success("Task removed");
+      qc.invalidateQueries({ queryKey: ["all-tasks"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const today = new Date().toISOString().slice(0, 10);
 
   const nameFor = (uid?: string | null) => {
     if (!uid) return "Unassigned";
-    const p: any = directory.find((d: any) => d.id === uid);
+    const p = directory.find((d) => d.id === uid);
     return p?.full_name ?? "Team member";
   };
 
   // Group by assignee
   const { todayGroups, previousGroups } = useMemo(() => {
-    const isToday = (t: any) => (t.created_at ?? "").slice(0, 10) === today || t.due_date === today;
-    const groupByOwner = (list: any[]) => {
-      const map = new Map<string, { name: string; ownerId: string; items: any[] }>();
+    const isToday = (t: Task) =>
+      (t.created_at ?? "").slice(0, 10) === today || t.due_date === today;
+    const groupByOwner = (list: Task[]) => {
+      const map = new Map<string, TaskGroup>();
       for (const t of list) {
         const owner = t.assigned_to ?? t.created_by ?? "unassigned";
         const name = nameFor(owner);
@@ -93,7 +124,7 @@ function TasksPage() {
     };
     return {
       todayGroups: groupByOwner(tasks.filter(isToday)),
-      previousGroups: groupByOwner(tasks.filter((t: any) => !isToday(t))),
+      previousGroups: groupByOwner(tasks.filter((t) => !isToday(t))),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, directory]);
@@ -103,15 +134,24 @@ function TasksPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold">Tasks</h1>
-          <p className="text-muted-foreground">Today's task lists, grouped by team member. History is collapsed below.</p>
+          <p className="text-muted-foreground">
+            Today's task lists, grouped by team member. History is collapsed below.
+          </p>
         </div>
-        {canAdd && <NewTaskDialog projects={projects} onAdded={() => qc.invalidateQueries({ queryKey: ["all-tasks"] })} />}
+        {canAdd && (
+          <NewTaskDialog
+            projects={projects}
+            onAdded={() => qc.invalidateQueries({ queryKey: ["all-tasks"] })}
+          />
+        )}
       </div>
 
       <Card className="p-6 border-primary/40 bg-primary/[0.04]">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold">Today · {fmtDate(today)}</h2>
-          <Badge variant="secondary">{todayGroups.reduce((n, g) => n + g.items.length, 0)} tasks</Badge>
+          <Badge variant="secondary">
+            {todayGroups.reduce((n, g) => n + g.items.length, 0)} tasks
+          </Badge>
         </div>
         {isLoading ? (
           <ListRowsSkeleton rows={3} />
@@ -137,7 +177,9 @@ function TasksPage() {
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold">Previous Tasks</h2>
-          <Badge variant="secondary">{previousGroups.reduce((n, g) => n + g.items.length, 0)} tasks</Badge>
+          <Badge variant="secondary">
+            {previousGroups.reduce((n, g) => n + g.items.length, 0)} tasks
+          </Badge>
         </div>
         {isLoading ? (
           <ListRowsSkeleton rows={3} />
@@ -151,7 +193,12 @@ function TasksPage() {
                   <div className="flex items-center gap-3">
                     <Avatar className="h-7 w-7">
                       <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
-                        {g.name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase()}
+                        {g.name
+                          .split(" ")
+                          .map((s) => s[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <span>{g.name}</span>
@@ -160,10 +207,15 @@ function TasksPage() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-2">
-                    {g.items.map((t: any) => (
-                      <TaskRow key={t.id} t={t} me={me} canEditAll={!!canEditAll}
+                    {g.items.map((t) => (
+                      <TaskRow
+                        key={t.id}
+                        t={t}
+                        me={me}
+                        canEditAll={!!canEditAll}
                         onStatus={(s: string) => updateStatus.mutate({ taskId: t.id, status: s })}
-                        onDelete={() => removeTask.mutate(t.id)} />
+                        onDelete={() => removeTask.mutate(t.id)}
+                      />
                     ))}
                   </div>
                 </AccordionContent>
@@ -176,29 +228,67 @@ function TasksPage() {
   );
 }
 
-function MemberGroup({ name, items, me, canEditAll, onStatus, onDelete }: any) {
-  const initials = name.split(" ").map((s: string) => s[0]).join("").slice(0, 2).toUpperCase();
+function MemberGroup({
+  name,
+  items,
+  me,
+  canEditAll,
+  onStatus,
+  onDelete,
+}: {
+  name: string;
+  items: Task[];
+  me: CurrentUser;
+  canEditAll: boolean;
+  onStatus: (taskId: string, status: string) => void;
+  onDelete: (taskId: string) => void;
+}) {
+  const initials = name
+    .split(" ")
+    .map((s: string) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
         <Avatar className="h-7 w-7">
-          <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">{initials}</AvatarFallback>
+          <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
+            {initials}
+          </AvatarFallback>
         </Avatar>
         <p className="font-medium">{name}</p>
         <Badge variant="secondary">{items.length}</Badge>
       </div>
       <div className="space-y-2">
-        {items.map((t: any) => (
-          <TaskRow key={t.id} t={t} me={me} canEditAll={canEditAll}
+        {items.map((t) => (
+          <TaskRow
+            key={t.id}
+            t={t}
+            me={me}
+            canEditAll={canEditAll}
             onStatus={(s: string) => onStatus(t.id, s)}
-            onDelete={() => onDelete(t.id)} />
+            onDelete={() => onDelete(t.id)}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function TaskRow({ t, me, canEditAll, onStatus, onDelete }: any) {
+function TaskRow({
+  t,
+  me,
+  canEditAll,
+  onStatus,
+  onDelete,
+}: {
+  t: Task;
+  me: CurrentUser;
+  canEditAll: boolean;
+  onStatus: (status: string) => void;
+  onDelete: () => void;
+}) {
   const qc = useQueryClient();
   // Only the person who created the task can edit or delete it.
   const canEditThis = !!me && t.created_by === me.user.id;
@@ -213,22 +303,37 @@ function TaskRow({ t, me, canEditAll, onStatus, onDelete }: any) {
           {t.phase?.name && ` · ${t.phase.name}`}
           {t.due_date && ` · due ${fmtDate(t.due_date)}`}
         </p>
-        {t.description && <p className="text-xs text-muted-foreground mt-1 break-words">{t.description}</p>}
+        {t.description && (
+          <p className="text-xs text-muted-foreground mt-1 break-words">{t.description}</p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary" className={priorityColor(t.priority)}>{t.priority}</Badge>
+        <Badge variant="secondary" className={priorityColor(t.priority)}>
+          {t.priority}
+        </Badge>
         {canEditThis ? (
           <Select value={t.status} onValueChange={onStatus}>
-            <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-36 h-8">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
+              {STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {statusLabel(s)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         ) : (
-          <Badge variant="secondary" className={statusColor(t.status)}>{statusLabel(t.status)}</Badge>
+          <Badge variant="secondary" className={statusColor(t.status)}>
+            {statusLabel(t.status)}
+          </Badge>
         )}
         {canEditThis && (
-          <EditTaskDialog task={t} onSaved={() => qc.invalidateQueries({ queryKey: ["all-tasks"] })} />
+          <EditTaskDialog
+            task={t}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["all-tasks"] })}
+          />
         )}
         {canDeleteThis && (
           <Button variant="ghost" size="icon" onClick={onDelete} title="Delete">
@@ -240,7 +345,7 @@ function TaskRow({ t, me, canEditAll, onStatus, onDelete }: any) {
   );
 }
 
-function EditTaskDialog({ task, onSaved }: { task: any; onSaved: () => void }) {
+function EditTaskDialog({ task, onSaved }: { task: Task; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: task.name ?? "",
@@ -251,46 +356,98 @@ function EditTaskDialog({ task, onSaved }: { task: any; onSaved: () => void }) {
   });
   const m = useMutation({
     mutationFn: async () => {
-      await updateTask({ data: { id: task.id, changes: {
-        name: form.name,
-        description: form.description || null,
-        priority: form.priority as any,
-        status: form.status as any,
-        due_date: form.due_date || null,
-      } } });
+      await updateTask({
+        data: {
+          id: task.id,
+          changes: {
+            name: form.name,
+            description: form.description || null,
+            priority: form.priority as Priority,
+            status: form.status as TaskStatus,
+            due_date: form.due_date || null,
+          },
+        },
+      });
     },
-    onSuccess: () => { toast.success("Task updated"); onSaved(); setOpen(false); },
-    onError: (e: any) => toast.error(e.message),
+    onSuccess: () => {
+      toast.success("Task updated");
+      onSaved();
+      setOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" title="Edit task"><Pencil className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" title="Edit task">
+          <Pencil className="h-4 w-4" />
+        </Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Edit Task</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Edit Task</DialogTitle>
+        </DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-2"><Label>Task *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Description</Label><Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+          <div className="space-y-2">
+            <Label>Task *</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Due</Label><DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} /></div>
+            <div className="space-y-2">
+              <Label>Due</Label>
+              <DatePicker
+                value={form.due_date}
+                onChange={(v) => setForm({ ...form, due_date: v })}
+              />
+            </div>
             <div className="space-y-2">
               <Label>Priority</Label>
-              <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{PRIORITIES.map((p) => <SelectItem key={p} value={p}>{statusLabel(p)}</SelectItem>)}</SelectContent>
+              <Select
+                value={form.priority}
+                onValueChange={(v) => setForm({ ...form, priority: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {statusLabel(p)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2 col-span-2">
               <Label>Status</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {statusLabel(s)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
           </div>
         </div>
-        <DialogFooter><Button disabled={!form.name || m.isPending} onClick={() => m.mutate()}>Save</Button></DialogFooter>
+        <DialogFooter>
+          <Button disabled={!form.name || m.isPending} onClick={() => m.mutate()}>
+            Save
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

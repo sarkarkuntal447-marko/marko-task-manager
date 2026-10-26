@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { listProjects, createProject } from "@/lib/projects.functions";
+import { listProjects, createProject, type ProjectInput } from "@/lib/projects.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,28 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
 } from "@/components/ui/table";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Plus, FolderKanban, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
@@ -30,7 +46,21 @@ export const Route = createFileRoute("/_authenticated/projects/")({
   component: ProjectsPage,
 });
 
-const STATUSES = ["planning", "requirement_gathering", "design", "development", "api_integration", "crm_integration", "testing", "deployment", "client_review", "maintenance", "completed", "on_hold", "cancelled"];
+const STATUSES = [
+  "planning",
+  "requirement_gathering",
+  "design",
+  "development",
+  "api_integration",
+  "crm_integration",
+  "testing",
+  "deployment",
+  "client_review",
+  "maintenance",
+  "completed",
+  "on_hold",
+  "cancelled",
+];
 const PRIORITIES = ["low", "medium", "high", "critical"];
 
 function ProjectsPage() {
@@ -50,19 +80,27 @@ function ProjectsPage() {
   });
 
   const create = useMutation({
-    mutationFn: async (input: any) => { await createProject({ data: input }); },
+    mutationFn: async (input: ProjectInput) => {
+      await createProject({ data: input });
+    },
     onSuccess: () => {
       toast.success("Project created");
       qc.invalidateQueries({ queryKey: ["projects"] });
       setOpen(false);
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const ql = q.trim().toLowerCase();
   const filtered = projects
     .filter((p) => filter === "all" || p.status === filter)
-    .filter((p) => !ql || `${p.name} ${p.description ?? ""} ${p.client_name ?? ""} ${p.client_company ?? ""}`.toLowerCase().includes(ql));
+    .filter(
+      (p) =>
+        !ql ||
+        `${p.name} ${p.description ?? ""} ${p.client_name ?? ""} ${p.client_company ?? ""}`
+          .toLowerCase()
+          .includes(ql),
+    );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -79,22 +117,31 @@ function ProjectsPage() {
             className="w-full sm:w-64"
           />
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              {STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
+              {STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {statusLabel(s)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           {canAdd && (
             <NewTaskDialog
-              projects={projects.map((p: any) => ({ id: p.id, name: p.name }))}
+              projects={projects.map((p) => ({ id: p.id, name: p.name }))}
               onAdded={() => qc.invalidateQueries({ queryKey: ["all-tasks"] })}
             />
           )}
           {canManage && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
-                <Button><Plus className="h-4 w-4 mr-2" />New Project</Button>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Project
+                </Button>
               </DialogTrigger>
               <NewProjectDialog onSubmit={(v) => create.mutate(v)} loading={create.isPending} />
             </Dialog>
@@ -109,7 +156,9 @@ function ProjectsPage() {
           <FolderKanban className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
           <h3 className="font-semibold">No projects yet</h3>
           <p className="text-sm text-muted-foreground">
-            {canManage ? "Create your first project to get started." : "Wait for an admin to add a project."}
+            {canManage
+              ? "Create your first project to get started."
+              : "Wait for an admin to add a project."}
           </p>
         </Card>
       ) : (
@@ -117,10 +166,14 @@ function ProjectsPage() {
           <Card className="p-6">
             <h2 className="font-semibold mb-4">Project Timeline</h2>
             <GanttChart
-              items={filtered.map((p: any) => ({
-                id: p.id, label: p.name, sublabel: statusLabel(p.status),
-                start: p.start_date, end: p.expected_delivery_date ?? p.actual_delivery_date,
-                progress: p.progress, done: p.status === "completed",
+              items={filtered.map((p) => ({
+                id: p.id,
+                label: p.name,
+                sublabel: statusLabel(p.status),
+                start: p.start_date,
+                end: p.expected_delivery_date ?? p.actual_delivery_date,
+                progress: p.progress,
+                done: p.status === "completed",
                 onClick: () => navigate({ to: "/projects/$id", params: { id: p.id } }),
               }))}
             />
@@ -152,10 +205,14 @@ function ProjectsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className={statusColor(p.status)}>{statusLabel(p.status)}</Badge>
+                      <Badge variant="secondary" className={statusColor(p.status)}>
+                        {statusLabel(p.status)}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className={priorityColor(p.priority)}>{p.priority}</Badge>
+                      <Badge variant="secondary" className={priorityColor(p.priority)}>
+                        {p.priority}
+                      </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <div className="w-full max-w-[140px]">
@@ -189,16 +246,33 @@ function ProjectsPage() {
   );
 }
 
-function NewProjectDialog({ onSubmit, loading }: { onSubmit: (v: any) => void; loading: boolean }) {
+function NewProjectDialog({
+  onSubmit,
+  loading,
+}: {
+  onSubmit: (v: ProjectInput) => void;
+  loading: boolean;
+}) {
   const [form, setForm] = useState({
-    name: "", description: "", client_name: "", client_company: "", client_email: "",
-    client_phone: "", start_date: "", expected_delivery_date: "", status: "planning",
-    priority: "medium", technology_stack: "", notes: "",
+    name: "",
+    description: "",
+    client_name: "",
+    client_company: "",
+    client_email: "",
+    client_phone: "",
+    start_date: "",
+    expected_delivery_date: "",
+    status: "planning",
+    priority: "medium",
+    technology_stack: "",
+    notes: "",
   });
   const update = (k: string, v: string) => setForm((s) => ({ ...s, [k]: v }));
   return (
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-      <DialogHeader><DialogTitle>New Project</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>New Project</DialogTitle>
+      </DialogHeader>
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2 space-y-2">
           <Label>Project Name *</Label>
@@ -206,43 +280,107 @@ function NewProjectDialog({ onSubmit, loading }: { onSubmit: (v: any) => void; l
         </div>
         <div className="sm:col-span-2 space-y-2">
           <Label>Description</Label>
-          <Textarea value={form.description} onChange={(e) => update("description", e.target.value)} rows={3} />
+          <Textarea
+            value={form.description}
+            onChange={(e) => update("description", e.target.value)}
+            rows={3}
+          />
         </div>
-        <div className="space-y-2"><Label>Client Name</Label><Input value={form.client_name} onChange={(e) => update("client_name", e.target.value)} /></div>
-        <div className="space-y-2"><Label>Client Company</Label><Input value={form.client_company} onChange={(e) => update("client_company", e.target.value)} /></div>
-        <div className="space-y-2"><Label>Client Email</Label><Input type="email" value={form.client_email} onChange={(e) => update("client_email", e.target.value)} /></div>
-        <div className="space-y-2"><Label>Client Phone</Label><Input value={form.client_phone} onChange={(e) => update("client_phone", e.target.value)} /></div>
-        <div className="space-y-2"><Label>Start Date</Label><DatePicker value={form.start_date} onChange={(v) => update("start_date", v)} /></div>
-        <div className="space-y-2"><Label>Expected Delivery</Label><DatePicker value={form.expected_delivery_date} onChange={(v) => update("expected_delivery_date", v)} /></div>
+        <div className="space-y-2">
+          <Label>Client Name</Label>
+          <Input value={form.client_name} onChange={(e) => update("client_name", e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Client Company</Label>
+          <Input
+            value={form.client_company}
+            onChange={(e) => update("client_company", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Client Email</Label>
+          <Input
+            type="email"
+            value={form.client_email}
+            onChange={(e) => update("client_email", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Client Phone</Label>
+          <Input
+            value={form.client_phone}
+            onChange={(e) => update("client_phone", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Start Date</Label>
+          <DatePicker value={form.start_date} onChange={(v) => update("start_date", v)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Expected Delivery</Label>
+          <DatePicker
+            value={form.expected_delivery_date}
+            onChange={(v) => update("expected_delivery_date", v)}
+          />
+        </div>
         <div className="space-y-2">
           <Label>Status</Label>
           <Select value={form.status} onValueChange={(v) => update("status", v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {statusLabel(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
           <Label>Priority</Label>
           <Select value={form.priority} onValueChange={(v) => update("priority", v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{PRIORITIES.map((p) => <SelectItem key={p} value={p}>{statusLabel(p)}</SelectItem>)}</SelectContent>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PRIORITIES.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {statusLabel(p)}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
         <div className="sm:col-span-2 space-y-2">
           <Label>Tech Stack (comma separated)</Label>
-          <Input value={form.technology_stack} onChange={(e) => update("technology_stack", e.target.value)} placeholder="React, Node, Postgres" />
+          <Input
+            value={form.technology_stack}
+            onChange={(e) => update("technology_stack", e.target.value)}
+            placeholder="React, Node, Postgres"
+          />
         </div>
       </div>
       <DialogFooter>
         <Button
           disabled={!form.name || loading}
-          onClick={() => onSubmit({
-            ...form,
-            start_date: form.start_date || null,
-            expected_delivery_date: form.expected_delivery_date || null,
-            technology_stack: form.technology_stack ? form.technology_stack.split(",").map((s) => s.trim()).filter(Boolean) : null,
-          })}
-        >Create Project</Button>
+          onClick={() =>
+            onSubmit({
+              ...form,
+              start_date: form.start_date || null,
+              expected_delivery_date: form.expected_delivery_date || null,
+              technology_stack: form.technology_stack
+                ? form.technology_stack
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                : null,
+            })
+          }
+        >
+          Create Project
+        </Button>
       </DialogFooter>
     </DialogContent>
   );

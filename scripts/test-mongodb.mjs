@@ -17,7 +17,9 @@ try {
   console.log(`MongoDB connection successful. Database: ${databaseName}`);
 } catch (error) {
   console.error(`MongoDB connection failed (${error?.name ?? "Error"}).`);
-  console.error("Check the Atlas database user, encoded password, cluster hostname, database permissions and IP access list.");
+  console.error(
+    "Check the Atlas database user, encoded password, cluster hostname, database permissions and IP access list.",
+  );
   process.exitCode = 1;
 } finally {
   await client.close();

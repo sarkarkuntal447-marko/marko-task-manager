@@ -1,6 +1,13 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 /**
  * Reusable loading placeholders ("skeletons").
@@ -41,7 +48,10 @@ export function ListRowsSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="p-3 rounded-lg border border-border flex flex-wrap items-center gap-3">
+        <div
+          key={i}
+          className="p-3 rounded-lg border border-border flex flex-wrap items-center gap-3"
+        >
           <div className="flex-1 min-w-[10rem] space-y-2">
             <Skeleton className="h-4 w-3/4 sm:w-1/2" />
             <Skeleton className="h-3 w-1/2 sm:w-1/3" />
@@ -123,11 +133,21 @@ export function ProjectsListSkeleton({ rows = 5 }: { rows?: number }) {
                   <Skeleton className="h-4 w-40 mb-2" />
                   <Skeleton className="h-3 w-56 max-w-full" />
                 </TableCell>
-                <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
-                <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
-                <TableCell className="hidden md:table-cell"><Skeleton className="h-2 w-24" /></TableCell>
-                <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
-                <TableCell className="hidden xl:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <Skeleton className="h-2 w-24" />
+                </TableCell>
+                <TableCell className="hidden lg:table-cell">
+                  <Skeleton className="h-4 w-24" />
+                </TableCell>
+                <TableCell className="hidden xl:table-cell">
+                  <Skeleton className="h-4 w-24" />
+                </TableCell>
                 <TableCell />
               </TableRow>
             ))}
@@ -275,10 +295,16 @@ export function TimelineSkeleton({ rows = 6 }: { rows?: number }) {
       </div>
       <div className="rounded-lg border border-border overflow-hidden">
         {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3 border-b border-border/60 last:border-0 h-[38px] px-3">
+          <div
+            key={i}
+            className="flex items-center gap-3 border-b border-border/60 last:border-0 h-[38px] px-3"
+          >
             <Skeleton className="h-3 w-24 sm:w-48 shrink-0" />
             <div className="flex-1 relative h-6">
-              <Skeleton className="absolute h-6" style={{ left: `${(i * 13) % 50}%`, width: `${25 + ((i * 7) % 30)}%` }} />
+              <Skeleton
+                className="absolute h-6"
+                style={{ left: `${(i * 13) % 50}%`, width: `${25 + ((i * 7) % 30)}%` }}
+              />
             </div>
           </div>
         ))}
@@ -341,9 +367,13 @@ export function AppShellSkeleton() {
         <main className="flex-1 px-3 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8 space-y-4 sm:space-y-6 max-w-7xl w-full mx-auto">
           <PageHeaderSkeleton />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {Array.from({ length: 4 }).map((_, i) => <MetricCardSkeleton key={i} />)}
+            {Array.from({ length: 4 }).map((_, i) => (
+              <MetricCardSkeleton key={i} />
+            ))}
           </div>
-          <Card className="p-4 sm:p-6"><ListRowsSkeleton rows={4} /></Card>
+          <Card className="p-4 sm:p-6">
+            <ListRowsSkeleton rows={4} />
+          </Card>
         </main>
       </div>
       <div className="md:hidden fixed inset-x-0 bottom-0 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)]">

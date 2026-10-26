@@ -14,7 +14,13 @@ interface DatePickerProps {
   disabled?: boolean;
 }
 
-export function DatePicker({ value, onChange, placeholder = "Pick a date", className, disabled }: DatePickerProps) {
+export function DatePicker({
+  value,
+  onChange,
+  placeholder = "Pick a date",
+  className,
+  disabled,
+}: DatePickerProps) {
   const date = value ? parseISO(value) : undefined;
   return (
     <Popover>

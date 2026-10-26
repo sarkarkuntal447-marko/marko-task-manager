@@ -14,7 +14,8 @@ const b64 = (b: Buffer | string) => Buffer.from(b).toString("base64url");
 
 function secret() {
   const s = process.env.JWT_SECRET;
-  if (!s || s.length < 32) throw new Error("Set JWT_SECRET (at least 32 characters) in your server environment.");
+  if (!s || s.length < 32)
+    throw new Error("Set JWT_SECRET (at least 32 characters) in your server environment.");
   return s;
 }
 
@@ -34,7 +35,9 @@ export async function verifyPassword(password: string, stored: string) {
 
 export function signSession(userId: string) {
   const head = b64(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = b64(JSON.stringify({ sub: userId, exp: Math.floor(Date.now() / 1000) + SESSION_SECONDS }));
+  const body = b64(
+    JSON.stringify({ sub: userId, exp: Math.floor(Date.now() / 1000) + SESSION_SECONDS }),
+  );
   const sig = createHmac("sha256", secret()).update(`${head}.${body}`).digest("base64url");
   return `${head}.${body}.${sig}`;
 }
@@ -47,22 +50,32 @@ function verifySession(token: string): string | null {
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
     const payload = JSON.parse(Buffer.from(body, "base64url").toString());
-    if (typeof payload.sub !== "string" || typeof payload.exp !== "number" || payload.exp < Date.now() / 1000) return null;
+    if (
+      typeof payload.sub !== "string" ||
+      typeof payload.exp !== "number" ||
+      payload.exp < Date.now() / 1000
+    )
+      return null;
     return payload.sub;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function readCookie(header: string | null, name: string) {
   for (const part of (header ?? "").split(";")) {
     const i = part.indexOf("=");
-    if (i > 0 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
+    if (i > 0 && part.slice(0, i).trim() === name)
+      return decodeURIComponent(part.slice(i + 1).trim());
   }
   return null;
 }
 
 export function setSessionCookie(token: string | null) {
   setCookie(SESSION_COOKIE, token ?? "", {
-    path: "/", httpOnly: true, sameSite: "lax",
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     maxAge: token ? SESSION_SECONDS : 0,
   });
@@ -75,5 +88,7 @@ export async function currentUserId(): Promise<string | null> {
   const id = token ? verifySession(token) : null;
   if (!id) return null;
   const db = await getDb();
-  return (await db.collection<UserDoc>("users").findOne({ id }, { projection: { id: 1 } })) ? id : null;
+  return (await db.collection<UserDoc>("users").findOne({ id }, { projection: { id: 1 } }))
+    ? id
+    : null;
 }

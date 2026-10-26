@@ -9,20 +9,54 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { statusLabel } from "@/lib/format";
+import type { Priority, TaskStatus } from "@/lib/types";
 
 const STATUSES = ["pending", "in_progress", "blocked", "testing", "completed"] as const;
 const PRIORITIES = ["low", "medium", "high", "critical"] as const;
 
-export function NewTaskDialog({ projects, onAdded }: { projects: any[]; onAdded: () => void }) {
+export function NewTaskDialog({
+  projects,
+  onAdded,
+}: {
+  projects: { id: string; name: string }[];
+  onAdded: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    name: "", description: "", project_id: "", phase_id: "", priority: "medium", status: "pending",
+    name: "",
+    description: "",
+    project_id: "",
+    phase_id: "",
+    priority: "medium",
+    status: "pending",
     due_date: new Date().toISOString().slice(0, 10),
   });
-  const reset = () => setForm({ name: "", description: "", project_id: "", phase_id: "", priority: "medium", status: "pending", due_date: new Date().toISOString().slice(0, 10) });
+  const reset = () =>
+    setForm({
+      name: "",
+      description: "",
+      project_id: "",
+      phase_id: "",
+      priority: "medium",
+      status: "pending",
+      due_date: new Date().toISOString().slice(0, 10),
+    });
 
   // Phases belong to a project, so load them once a project is picked.
   const { data: phases = [], isFetching: loadingPhases } = useQuery({
@@ -33,7 +67,8 @@ export function NewTaskDialog({ projects, onAdded }: { projects: any[]; onAdded:
 
   // A project that already has phases needs one picked; a brand-new project (no phases yet) does not.
   const phaseRequired = !!form.project_id && phases.length > 0;
-  const canSubmit = !!form.name && !(form.project_id && loadingPhases) && !(phaseRequired && !form.phase_id);
+  const canSubmit =
+    !!form.name && !(form.project_id && loadingPhases) && !(phaseRequired && !form.phase_id);
 
   const m = useMutation({
     mutationFn: async () => {
@@ -43,61 +78,140 @@ export function NewTaskDialog({ projects, onAdded }: { projects: any[]; onAdded:
           description: form.description || null,
           project_id: form.project_id || null,
           phase_id: form.phase_id || null,
-          priority: form.priority as any,
-          status: form.status as any,
+          priority: form.priority as Priority,
+          status: form.status as TaskStatus,
           due_date: form.due_date || null,
-        }
+        },
       });
     },
-    onSuccess: () => { toast.success("Task added"); onAdded(); setOpen(false); reset(); },
-    onError: (e: any) => toast.error(e.message),
+    onSuccess: () => {
+      toast.success("Task added");
+      onAdded();
+      setOpen(false);
+      reset();
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Add Task</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Task
+        </Button>
+      </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Add to My Task List</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Add to My Task List</DialogTitle>
+        </DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-2"><Label>Task *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Description</Label><Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+          <div className="space-y-2">
+            <Label>Task *</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Project</Label>
-              <Select value={form.project_id} onValueChange={(v) => setForm({ ...form, project_id: v, phase_id: "" })}>
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>{projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+              <Select
+                value={form.project_id}
+                onValueChange={(v) => setForm({ ...form, project_id: v, phase_id: "" })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Phase{phaseRequired ? " *" : ""}</Label>
-              <Select value={form.phase_id} onValueChange={(v) => setForm({ ...form, phase_id: v })} disabled={!form.project_id}>
+              <Select
+                value={form.phase_id}
+                onValueChange={(v) => setForm({ ...form, phase_id: v })}
+                disabled={!form.project_id}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder={!form.project_id ? "Select a project first" : loadingPhases ? "Loading…" : phases.length ? "Select a phase" : "No phases yet (not required)"} />
+                  <SelectValue
+                    placeholder={
+                      !form.project_id
+                        ? "Select a project first"
+                        : loadingPhases
+                          ? "Loading…"
+                          : phases.length
+                            ? "Select a phase"
+                            : "No phases yet (not required)"
+                    }
+                  />
                 </SelectTrigger>
-                <SelectContent>{phases.map((ph: any) => <SelectItem key={ph.id} value={ph.id}>{ph.name}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {phases.map((ph) => (
+                    <SelectItem key={ph.id} value={ph.id}>
+                      {ph.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
           </div>
-          <div className="space-y-2"><Label>Due</Label><DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} /></div>
+          <div className="space-y-2">
+            <Label>Due</Label>
+            <DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Priority</Label>
-              <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{PRIORITIES.map((p) => <SelectItem key={p} value={p}>{statusLabel(p)}</SelectItem>)}</SelectContent>
+              <Select
+                value={form.priority}
+                onValueChange={(v) => setForm({ ...form, priority: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {statusLabel(p)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {statusLabel(s)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
           </div>
         </div>
-        <DialogFooter><Button disabled={!canSubmit || m.isPending} onClick={() => m.mutate()}>Add Task</Button></DialogFooter>
+        <DialogFooter>
+          <Button disabled={!canSubmit || m.isPending} onClick={() => m.mutate()}>
+            Add Task
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

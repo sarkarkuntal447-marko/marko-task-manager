@@ -24,12 +24,15 @@ export const statusColor = (s: string): string => {
   return map[s] ?? "bg-muted text-muted-foreground";
 };
 
-export const priorityColor = (p: string): string => ({
-  low: "bg-muted text-muted-foreground",
-  medium: "bg-info/10 text-info",
-  high: "bg-warning/15 text-warning-foreground",
-  critical: "bg-destructive/10 text-destructive",
-}[p] ?? "bg-muted text-muted-foreground");
+export const priorityColor = (p: string): string =>
+  ({
+    low: "bg-muted text-muted-foreground",
+    medium: "bg-info/10 text-info",
+    high: "bg-warning/15 text-warning-foreground",
+    critical: "bg-destructive/10 text-destructive",
+  })[p] ?? "bg-muted text-muted-foreground";
 
 export const fmtDate = (d?: string | null) =>
-  d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
+  d
+    ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : "—";

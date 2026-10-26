@@ -51,7 +51,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             Try again
@@ -80,13 +83,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "apple-mobile-web-app-title", content: "Marko Projects" },
       { title: "Marko — Project Management Dashboard" },
-      { name: "description", content: "Internal project management dashboard for web development teams." },
+      {
+        name: "description",
+        content: "Internal project management dashboard for web development teams.",
+      },
       { property: "og:title", content: "Marko — Project Management Dashboard" },
       { name: "twitter:title", content: "Marko — Project Management Dashboard" },
-      { property: "og:description", content: "Internal project management dashboard for web development teams." },
-      { name: "twitter:description", content: "Internal project management dashboard for web development teams." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/76efd9f5-a1e7-4956-aa1f-fc6dfb410373" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/76efd9f5-a1e7-4956-aa1f-fc6dfb410373" },
+      {
+        property: "og:description",
+        content: "Internal project management dashboard for web development teams.",
+      },
+      {
+        name: "twitter:description",
+        content: "Internal project management dashboard for web development teams.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/76efd9f5-a1e7-4956-aa1f-fc6dfb410373",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/76efd9f5-a1e7-4956-aa1f-fc6dfb410373",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -98,7 +118,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -110,8 +133,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
     </html>
   );
 }
@@ -130,7 +158,12 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
-      <Toaster richColors position="top-right" offset={{ top: "max(16px, env(safe-area-inset-top))" }} mobileOffset={{ top: "max(12px, env(safe-area-inset-top))" }} />
+      <Toaster
+        richColors
+        position="top-right"
+        offset={{ top: "max(16px, env(safe-area-inset-top))" }}
+        mobileOffset={{ top: "max(12px, env(safe-area-inset-top))" }}
+      />
     </QueryClientProvider>
   );
 }

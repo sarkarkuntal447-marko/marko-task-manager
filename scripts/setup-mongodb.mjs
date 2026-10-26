@@ -4,7 +4,10 @@ import { MongoClient } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB;
-if (!uri || !dbName) { console.error("Set MONGODB_URI and MONGODB_DB in .env"); process.exit(1); }
+if (!uri || !dbName) {
+  console.error("Set MONGODB_URI and MONGODB_DB in .env");
+  process.exit(1);
+}
 
 const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10000 });
 try {

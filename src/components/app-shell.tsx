@@ -1,8 +1,15 @@
 import { type ReactNode, useState } from "react";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, FolderKanban, ListTodo, Users, ClipboardList,
-  Settings, LogOut, Bell, Menu,
+  LayoutDashboard,
+  FolderKanban,
+  ListTodo,
+  Users,
+  ClipboardList,
+  Settings,
+  LogOut,
+  Bell,
+  Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,7 +17,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { logout, listActivity } from "@/lib/app.functions";
+import { getSession, logout, listActivity } from "@/lib/app.functions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const nav = [
@@ -31,7 +38,15 @@ const roleLabel: Record<string, string> = {
 const isActive = (pathname: string, to: string) => pathname === to || pathname.startsWith(to + "/");
 
 // `rail` = the desktop sidebar. On tablets (md) it shrinks to an icon-only rail; on lg+ it shows labels.
-function NavList({ pathname, onNavigate, rail }: { pathname: string; onNavigate?: () => void; rail?: boolean }) {
+function NavList({
+  pathname,
+  onNavigate,
+  rail,
+}: {
+  pathname: string;
+  onNavigate?: () => void;
+  rail?: boolean;
+}) {
   return (
     <nav className="flex-1 overflow-y-auto p-3 space-y-1">
       {nav.map((item) => {
@@ -61,16 +76,28 @@ function NavList({ pathname, onNavigate, rail }: { pathname: string; onNavigate?
 }
 
 function SidebarBody({
-  pathname, me, initials, signOut, onNavigate, rail,
+  pathname,
+  me,
+  initials,
+  signOut,
+  onNavigate,
+  rail,
 }: {
-  pathname: string; me: any; initials: string; signOut: () => void; onNavigate?: () => void; rail?: boolean;
+  pathname: string;
+  me: Awaited<ReturnType<typeof getSession>> | undefined;
+  initials: string;
+  signOut: () => void;
+  onNavigate?: () => void;
+  rail?: boolean;
 }) {
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className={cn(
-        "h-16 shrink-0 flex items-center gap-2 px-5 border-b border-sidebar-border font-display font-bold text-lg",
-        rail && "md:max-lg:justify-center md:max-lg:px-0",
-      )}>
+      <div
+        className={cn(
+          "h-16 shrink-0 flex items-center gap-2 px-5 border-b border-sidebar-border font-display font-bold text-lg",
+          rail && "md:max-lg:justify-center md:max-lg:px-0",
+        )}
+      >
         <img
           src="/favicon.ico"
           alt="Marko & Brando"
@@ -95,12 +122,24 @@ function SidebarBody({
             </AvatarFallback>
           </Avatar>
           <div className={cn("flex-1 min-w-0", rail && "md:max-lg:hidden")}>
-            <p className="text-sm font-medium truncate">{me?.profile?.full_name ?? me?.user.email}</p>
+            <p className="text-sm font-medium truncate">
+              {me?.profile?.full_name ?? me?.user.email}
+            </p>
             <p className="text-xs text-muted-foreground truncate">
               {me?.role ? roleLabel[me.role] : ""}
             </p>
           </div>
-          <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => { e.preventDefault(); e.stopPropagation(); signOut(); }} title="Sign out">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              signOut();
+            }}
+            title="Sign out"
+          >
             <LogOut className="h-4 w-4" />
           </Button>
         </Link>
@@ -127,7 +166,12 @@ function BottomNav({ pathname }: { pathname: string }) {
                 active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-primary text-primary-foreground")}>
+              <span
+                className={cn(
+                  "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
+                  active && "bg-primary text-primary-foreground",
+                )}
+              >
                 <Icon className="h-5 w-5" />
               </span>
               {item.short}
@@ -154,7 +198,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   const initials = (me?.profile?.full_name ?? me?.user.email ?? "U")
-    .split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+    .split(" ")
+    .map((s) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="min-h-dvh w-full flex bg-background">
@@ -181,7 +229,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 />
               </SheetContent>
             </Sheet>
-            <Link to="/dashboard" className="md:hidden font-display font-bold flex items-center gap-2 min-w-0">
+            <Link
+              to="/dashboard"
+              className="md:hidden font-display font-bold flex items-center gap-2 min-w-0"
+            >
               <img
                 src="/favicon.ico"
                 alt="Marko & Brando"
@@ -192,7 +243,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex-1" />
             <NotificationsBell userId={me?.user.id} />
             <Button asChild variant="ghost" size="icon" title="Settings">
-              <Link to="/settings"><Settings className="h-4 w-4" /></Link>
+              <Link to="/settings">
+                <Settings className="h-4 w-4" />
+              </Link>
             </Button>
           </div>
         </header>
@@ -241,7 +294,11 @@ function NotificationsBell({ userId }: { userId?: string }) {
   };
 
   return (
-    <Popover onOpenChange={(o) => { if (o) markSeen(); }}>
+    <Popover
+      onOpenChange={(o) => {
+        if (o) markSeen();
+      }}
+    >
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" title="Notifications">
           <Bell className="h-4 w-4" />
@@ -250,21 +307,29 @@ function NotificationsBell({ userId }: { userId?: string }) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" collisionPadding={12} className="w-[calc(100vw-1.5rem)] max-w-80 p-0">
+      <PopoverContent
+        align="end"
+        collisionPadding={12}
+        className="w-[calc(100vw-1.5rem)] max-w-80 p-0"
+      >
         <div className="p-3 border-b border-border font-semibold text-sm">Recent activity</div>
         <ul className="max-h-[60dvh] sm:max-h-80 overflow-auto">
           {items.length === 0 ? (
             <li className="p-4 text-sm text-muted-foreground">Nothing yet.</li>
-          ) : items.map((a: any) => (
-            <li key={a.id} className="p-3 border-b border-border last:border-0 text-sm">
-              <p className="line-clamp-2 break-words">
-                <b>{a.actor_name ?? "Someone"}</b>{" "}
-                <span className="text-muted-foreground">{a.action.replace(/[._]/g, " ")}</span>{" "}
-                <b>{a.entity_name}</b>
-              </p>
-              <p className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</p>
-            </li>
-          ))}
+          ) : (
+            items.map((a) => (
+              <li key={a.id} className="p-3 border-b border-border last:border-0 text-sm">
+                <p className="line-clamp-2 break-words">
+                  <b>{a.actor_name ?? "Someone"}</b>{" "}
+                  <span className="text-muted-foreground">{a.action.replace(/[._]/g, " ")}</span>{" "}
+                  <b>{a.entity_name}</b>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(a.created_at).toLocaleString()}
+                </p>
+              </li>
+            ))
+          )}
         </ul>
         <div className="p-2 border-t border-border">
           <Button asChild variant="ghost" size="sm" className="w-full">

@@ -4,11 +4,27 @@ import { getDashboard } from "@/lib/app.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  FolderKanban, CheckCircle2, Clock, AlertTriangle, Users, ListTodo, TrendingUp, PauseCircle,
+  FolderKanban,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Users,
+  ListTodo,
+  TrendingUp,
+  PauseCircle,
 } from "lucide-react";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
 } from "recharts";
 import { statusLabel, statusColor, fmtDate } from "@/lib/format";
 import { MetricCardSkeleton, ChartCardSkeleton, ListRowsSkeleton } from "@/components/skeletons";
@@ -38,7 +54,7 @@ function DashboardPage() {
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      const d = await getDashboard() as Omit<DashboardData, "recent">;
+      const d = (await getDashboard()) as Omit<DashboardData, "recent">;
       return { ...d, recent: d.projects.slice(0, 6) };
     },
   });
@@ -48,22 +64,39 @@ function DashboardPage() {
   const profiles = data?.profiles ?? [];
 
   const total = projects.length;
-  const active = projects.filter((p) => !["completed", "on_hold", "cancelled"].includes(p.status)).length;
+  const active = projects.filter(
+    (p) => !["completed", "on_hold", "cancelled"].includes(p.status),
+  ).length;
   const completed = projects.filter((p) => p.status === "completed").length;
   const onHold = projects.filter((p) => p.status === "on_hold").length;
-  const delayed = projects.filter((p) => p.progress < 100 && !["completed", "cancelled"].includes(p.status)).length;
+  const delayed = projects.filter(
+    (p) => p.progress < 100 && !["completed", "cancelled"].includes(p.status),
+  ).length;
 
   const pendingTasks = tasks.filter((t) => t.status !== "completed").length;
   const completedTasks = tasks.filter((t) => t.status === "completed").length;
 
   const employees = profiles.length;
-  const activeEmployees = profiles.filter((p) => p.availability === "available" || p.availability === "busy").length;
+  const activeEmployees = profiles.filter(
+    (p) => p.availability === "available" || p.availability === "busy",
+  ).length;
 
   const statusCounts = projects.reduce<Record<string, number>>((a, p) => {
-    a[p.status] = (a[p.status] ?? 0) + 1; return a;
+    a[p.status] = (a[p.status] ?? 0) + 1;
+    return a;
   }, {});
-  const pieData = Object.entries(statusCounts).map(([k, v]) => ({ name: statusLabel(k), value: v }));
-  const COLORS = ["hsl(259 70% 55%)", "hsl(155 50% 50%)", "hsl(75 70% 55%)", "hsl(25 75% 55%)", "hsl(230 60% 55%)", "hsl(320 50% 55%)"];
+  const pieData = Object.entries(statusCounts).map(([k, v]) => ({
+    name: statusLabel(k),
+    value: v,
+  }));
+  const COLORS = [
+    "hsl(259 70% 55%)",
+    "hsl(155 50% 50%)",
+    "hsl(75 70% 55%)",
+    "hsl(25 75% 55%)",
+    "hsl(230 60% 55%)",
+    "hsl(320 50% 55%)",
+  ];
 
   const taskByPriority = ["low", "medium", "high", "critical"].map((p) => ({
     priority: p[0].toUpperCase() + p.slice(1),
@@ -75,7 +108,9 @@ function DashboardPage() {
     <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
-        <p className="text-sm sm:text-base text-muted-foreground">Live snapshot of every project, person, and deadline.</p>
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Live snapshot of every project, person, and deadline.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -88,7 +123,13 @@ function DashboardPage() {
             <Metric icon={CheckCircle2} label="Completed" value={completed} tone="success" />
             <Metric icon={PauseCircle} label="On Hold" value={onHold} tone="muted" />
             <Metric icon={AlertTriangle} label="Delayed" value={delayed} tone="warning" />
-            <Metric icon={Users} label="Employees" value={employees} sub={`${activeEmployees} active`} tone="primary" />
+            <Metric
+              icon={Users}
+              label="Employees"
+              value={employees}
+              sub={`${activeEmployees} active`}
+              tone="primary"
+            />
             <Metric icon={ListTodo} label="Pending Tasks" value={pendingTasks} tone="info" />
             <Metric icon={Clock} label="Completed Tasks" value={completedTasks} tone="success" />
           </>
@@ -111,8 +152,17 @@ function DashboardPage() {
                 ) : (
                   <ResponsiveContainer>
                     <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={2}>
-                        {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="55%"
+                        outerRadius="85%"
+                        paddingAngle={2}
+                      >
+                        {pieData.map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                        ))}
                       </Pie>
                       <Tooltip />
                     </PieChart>
@@ -125,10 +175,23 @@ function DashboardPage() {
               <h3 className="font-semibold mb-4">Tasks by Priority</h3>
               <div className="h-56 sm:h-64">
                 <ResponsiveContainer>
-                  <BarChart data={taskByPriority} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                  <BarChart
+                    data={taskByPriority}
+                    margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="priority" stroke="hsl(var(--muted-foreground))" fontSize={12} interval={0} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} width={40} />
+                    <XAxis
+                      dataKey="priority"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      interval={0}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      allowDecimals={false}
+                      width={40}
+                    />
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="Pending" fill="hsl(259 70% 60%)" radius={[6, 6, 0, 0]} />
@@ -146,14 +209,18 @@ function DashboardPage() {
         {isLoading ? (
           <ListRowsSkeleton rows={4} />
         ) : data?.recent.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No projects yet. Create one from the Projects page.</p>
+          <p className="text-sm text-muted-foreground">
+            No projects yet. Create one from the Projects page.
+          </p>
         ) : (
           <div className="divide-y divide-border">
             {data?.recent.map((p) => (
               <div key={p.id} className="py-3 flex items-center gap-3 sm:gap-4">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{p.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">Due {fmtDate(p.expected_delivery_date)}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    Due {fmtDate(p.expected_delivery_date)}
+                  </p>
                 </div>
                 <div className="w-24 sm:w-32 hidden sm:block shrink-0">
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -161,7 +228,9 @@ function DashboardPage() {
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{p.progress}%</p>
                 </div>
-                <Badge variant="secondary" className={`${statusColor(p.status)} shrink-0`}>{statusLabel(p.status)}</Badge>
+                <Badge variant="secondary" className={`${statusColor(p.status)} shrink-0`}>
+                  {statusLabel(p.status)}
+                </Badge>
               </div>
             ))}
           </div>
@@ -171,8 +240,17 @@ function DashboardPage() {
   );
 }
 
-function Metric({ icon: Icon, label, value, sub, tone }: {
-  icon: React.ComponentType<{ className?: string }>; label: string; value: number; sub?: string;
+function Metric({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  sub?: string;
   tone: "primary" | "success" | "warning" | "info" | "muted";
 }) {
   const toneClass: Record<string, string> = {
@@ -185,11 +263,18 @@ function Metric({ icon: Icon, label, value, sub, tone }: {
   return (
     <Card className="p-3 sm:p-4 min-w-0">
       <div className="flex items-center gap-3">
-        <div className={`h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-lg flex items-center justify-center ${toneClass[tone]}`}>
+        <div
+          className={`h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-lg flex items-center justify-center ${toneClass[tone]}`}
+        >
           <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-[11px] sm:text-xs text-muted-foreground uppercase tracking-wide truncate" title={label}>{label}</p>
+          <p
+            className="text-[11px] sm:text-xs text-muted-foreground uppercase tracking-wide truncate"
+            title={label}
+          >
+            {label}
+          </p>
           <p className="text-xl sm:text-2xl font-bold leading-none mt-1">{value}</p>
           {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
         </div>
@@ -199,5 +284,9 @@ function Metric({ icon: Icon, label, value, sub, tone }: {
 }
 
 function EmptyChart({ label }: { label: string }) {
-  return <div className="h-full flex items-center justify-center text-sm text-muted-foreground">{label}</div>;
+  return (
+    <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+      {label}
+    </div>
+  );
 }
