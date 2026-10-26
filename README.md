@@ -10,6 +10,21 @@ The app now stores everything in MongoDB (Supabase has been removed).
 5. `npm run db:create-admin -- you@example.com "Password" "Your Name"` — creates the first super admin.
 6. `npm run dev`
 
+## Deploy to Vercel
+
+The production build uses Nitro's Vercel preset and runs as a Node.js server function.
+
+1. Push the project to a Git provider and import the repository into Vercel.
+2. Use `npm install` for the install command and `npm run build` for the build command. Leave the output directory unset so Vercel can use Nitro's generated deployment output.
+3. In Vercel's **Project Settings → Environment Variables**, add these server-only variables for the environments you deploy:
+   - `MONGODB_URI` — your MongoDB connection string.
+   - `MONGODB_DB` — the database name, for example `marko`.
+   - `JWT_SECRET` — a long, random secret of at least 32 characters. Generate a unique production value; do not reuse or commit the local `.env` value.
+4. Ensure your MongoDB provider permits connections from Vercel. With MongoDB Atlas, Vercel's serverless functions do not have fixed outbound IPs on standard plans, so configure Atlas network access accordingly and use a strong, least-privilege database user.
+5. Before using the app, connect to the production database and run `npm run db:setup` and `npm run db:create-admin -- you@example.com "Password" "Your Name"` from a trusted machine with the production MongoDB values in its local `.env`. Keep that file out of Git.
+
+Redeploy after changing environment variables. Never add MongoDB credentials or `JWT_SECRET` as `VITE_*` variables; those are exposed to browser code.
+
 ## How it works
 - **Auth:** email + password. Passwords are hashed with scrypt and stored in `users`. A signed session
   cookie (httpOnly, 7 days) is set on login; every server function checks it via `src/lib/auth-middleware.ts`.
