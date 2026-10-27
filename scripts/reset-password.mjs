@@ -14,7 +14,9 @@ if (!uri || !dbName) {
 }
 
 if (!emailArg || !newPassword || newPassword.length < 6) {
-  console.error("Usage: node --env-file=.env scripts/reset-password.mjs <email> <newPassword (6+ chars)>");
+  console.error(
+    "Usage: node --env-file=.env scripts/reset-password.mjs <email> <newPassword (6+ chars)>",
+  );
   process.exit(1);
 }
 
@@ -27,10 +29,7 @@ const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10000 });
 try {
   await client.connect();
   const db = client.db(dbName);
-  const result = await db.collection("users").updateOne(
-    { email },
-    { $set: { password_hash } }
-  );
+  const result = await db.collection("users").updateOne({ email }, { $set: { password_hash } });
 
   if (result.matchedCount === 0) {
     console.error(`No user found with email: ${email}`);

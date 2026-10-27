@@ -3,6 +3,7 @@
 The app now stores everything in MongoDB (Supabase has been removed).
 
 ## Setup
+
 1. `cp .env.example .env` and fill in `MONGODB_URI`, `MONGODB_DB` and `JWT_SECRET`.
 2. `npm install`
 3. `npm run db:test` — checks the connection.
@@ -26,6 +27,7 @@ The production build uses Nitro's Vercel preset and runs as a Node.js server fun
 Redeploy after changing environment variables. Never add MongoDB credentials or `JWT_SECRET` as `VITE_*` variables; those are exposed to browser code.
 
 ## How it works
+
 - **Auth:** email + password. Passwords are hashed with scrypt and stored in `users`. A signed session
   cookie (httpOnly, 7 days) is set on login; every server function checks it via `src/lib/auth-middleware.ts`.
 - **Permissions:** the old Postgres row-level-security rules are enforced in `src/lib/app.server.ts` and

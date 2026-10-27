@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { listProjects, createProject, type ProjectInput } from "@/lib/projects.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,14 @@ import { ArchivedProjects } from "@/components/archived-projects";
 import { ProjectsListSkeleton } from "@/components/skeletons";
 import { useCurrentUser, canManageProjects } from "@/hooks/use-current-user";
 
+type ProjectSearch = {
+  status?: string;
+};
+
 export const Route = createFileRoute("/_authenticated/projects/")({
+  validateSearch: (search: Record<string, unknown>): ProjectSearch => ({
+    status: typeof search.status === "string" ? search.status : undefined,
+  }),
   head: () => ({ meta: [{ title: "Projects — Marko Projects" }] }),
   component: ProjectsPage,
 });
@@ -71,7 +78,11 @@ function ProjectsPage() {
   // Every signed-in user (including super admin) can add a task.
   const canAdd = !!me;
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState<string>("all");
+  const search = Route.useSearch();
+  const [filter, setFilter] = useState<string>(search.status || "all");
+  useEffect(() => {
+    if (search.status) setFilter(search.status);
+  }, [search.status]);
   const [q, setQ] = useState("");
 
   const { data: projects = [], isLoading } = useQuery({
@@ -93,7 +104,13 @@ function ProjectsPage() {
 
   const ql = q.trim().toLowerCase();
   const filtered = projects
-    .filter((p) => filter === "all" || p.status === filter)
+    .filter((p) => {
+      if (filter === "all") return true;
+      if (filter === "active") return !["completed", "on_hold", "cancelled"].includes(p.status);
+      if (filter === "delayed")
+        return p.progress < 100 && !["completed", "cancelled"].includes(p.status);
+      return p.status === filter;
+    })
     .filter(
       (p) =>
         !ql ||
@@ -122,6 +139,8 @@ function ProjectsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active projects</SelectItem>
+              <SelectItem value="delayed">Delayed projects</SelectItem>
               {STATUSES.map((s) => (
                 <SelectItem key={s} value={s}>
                   {statusLabel(s)}
