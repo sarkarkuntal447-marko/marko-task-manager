@@ -239,6 +239,12 @@ function ProjectDetail() {
   const safeMembers = Array.isArray(members) ? members : [];
   const safeProjectMembers = Array.isArray(projectMembers) ? projectMembers : [];
   const safePhases = Array.isArray(phases) ? phases : [];
+  // Open phases first, then by end date (earliest first); phases without an end date go last.
+  const orderedPhases = [...safePhases].sort(
+    (a, b) =>
+      Number(a.completed) - Number(b.completed) ||
+      (a.end_date ?? "9999-12-31").localeCompare(b.end_date ?? "9999-12-31"),
+  );
   const safeTasks = Array.isArray(tasks) ? tasks : [];
   const memberIds = safeProjectMembers.map((m) => m.user_id).filter(Boolean);
   const workingMembers = safeMembers.filter((m) => memberIds.includes(m.id));
@@ -423,7 +429,7 @@ function ProjectDetail() {
               <p className="text-sm text-muted-foreground">No phases yet.</p>
             ) : (
               <div className="space-y-2">
-                {safePhases.map((ph) => {
+                {orderedPhases.map((ph) => {
                   const owner = safeMembers.find((m) => m.id === ph.assigned_to);
                   const subs = ph.sub_phases ?? [];
                   return (
