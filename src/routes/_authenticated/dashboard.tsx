@@ -129,7 +129,7 @@ function DashboardPage() {
             />
             <Metric
               icon={TrendingUp}
-              label="Active"
+              label="Active Project"
               value={active}
               tone="info"
               to="/projects"
@@ -137,7 +137,7 @@ function DashboardPage() {
             />
             <Metric
               icon={CheckCircle2}
-              label="Completed"
+              label="Completed Project"
               value={completed}
               tone="success"
               to="/projects"
@@ -145,7 +145,7 @@ function DashboardPage() {
             />
             <Metric
               icon={PauseCircle}
-              label="On Hold"
+              label="On Hold Projects"
               value={onHold}
               tone="muted"
               to="/projects"
