@@ -29,10 +29,10 @@ const nav = [
 ] as const;
 
 const roleLabel: Record<string, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  moderator: "Moderator",
-  developer: "Developer",
+  Super_Admin: "Super Admin",
+  Admin: "Admin",
+  SEO: "SEO",
+  Developer: "Developer",
 };
 
 const isActive = (pathname: string, to: string) => pathname === to || pathname.startsWith(to + "/");

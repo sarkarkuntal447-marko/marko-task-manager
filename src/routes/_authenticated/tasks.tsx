@@ -56,7 +56,7 @@ const PRIORITIES = ["low", "medium", "high", "critical"] as const;
 function TasksPage() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
-  const canEditAll = me?.role === "super_admin" || me?.role === "admin" || me?.role === "moderator";
+  const canEditAll = me?.role === "Super_Admin" || me?.role === "Admin" || me?.role === "SEO";
   // Every signed-in user (including super admin) can add a task.
   const canAdd = !!me;
 

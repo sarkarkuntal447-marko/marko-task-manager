@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, Briefcase, Calendar, Crown, Wrench } from "lucide-react";
-import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
+import { statusLabel, statusColor, priorityColor, availabilityLabel, fmtDate } from "@/lib/format";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { MemberDetailSkeleton } from "@/components/skeletons";
 
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/team/$id")({
 function MemberDetail() {
   const { id } = Route.useParams();
   const { data: me } = useCurrentUser();
-  const isStaff = me?.role === "super_admin" || me?.role === "admin" || me?.role === "moderator";
+  const isStaff = me?.role === "Super_Admin" || me?.role === "Admin" || me?.role === "SEO";
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["team-member", id],
@@ -81,7 +81,7 @@ function MemberDetail() {
                   <Calendar className="h-3 w-3" /> joined {fmtDate(member.joining_date)}
                 </span>
               )}
-              <Badge variant="secondary">{(member.availability ?? "").replace("_", " ")}</Badge>
+              <Badge variant="secondary">{availabilityLabel(member.availability)}</Badge>
             </div>
             {!isStaff && (
               <p className="text-xs text-muted-foreground mt-2 italic">

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { deleteUser, getTeamWithWorkload } from "@/lib/app.functions";
 import { TeamCardSkeleton } from "@/components/skeletons";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { availabilityLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -37,7 +38,7 @@ type TeamMember = Awaited<ReturnType<typeof getTeamWithWorkload>>[number];
 function TeamPage() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
-  const isSuper = me?.roles?.includes("super_admin") ?? false;
+  const isSuper = me?.roles?.includes("Super_Admin") ?? false;
   const [target, setTarget] = useState<TeamMember | null>(null);
 
   const remove = useMutation({
@@ -117,7 +118,7 @@ function TeamPage() {
                       variant="secondary"
                       className={`${availabilityColor[m.availability]} ${canDelete(m) ? "mr-8" : ""}`}
                     >
-                      {m.availability.replace("_", " ")}
+                      {availabilityLabel(m.availability)}
                     </Badge>
                   </div>
                   {m.department && (

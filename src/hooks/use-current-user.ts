@@ -13,8 +13,8 @@ export function useCurrentUser() {
 }
 
 export function canManageProjects(role?: AppRole) {
-  return role === "super_admin" || role === "admin";
+  return role === "Super_Admin" || role === "Admin";
 }
 export function canAssignTasks(role?: AppRole) {
-  return role === "super_admin" || role === "admin" || role === "moderator";
+  return role === "Super_Admin" || role === "Admin" || role === "SEO";
 }

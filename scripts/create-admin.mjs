@@ -1,4 +1,4 @@
-// Creates a user with the super_admin role (use it once to bootstrap the first account).
+// Creates a user with the Super_Admin role (use it once to bootstrap the first account).
 // Usage: npm run db:create-admin -- you@example.com "StrongPassword" "Your Name"
 import { randomBytes, randomUUID, scrypt } from "node:crypto";
 import { promisify } from "node:util";
@@ -46,7 +46,7 @@ try {
   });
   await db
     .collection("user_roles")
-    .insertOne({ id: randomUUID(), user_id: id, role: "super_admin", created_at: ts });
+    .insertOne({ id: randomUUID(), user_id: id, role: "Super_Admin", created_at: ts });
   console.log(`Super admin created: ${email}`);
 } catch (e) {
   console.error("Failed:", e?.message ?? e);

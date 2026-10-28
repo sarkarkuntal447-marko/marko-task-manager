@@ -50,6 +50,8 @@ async function progress(db: Db, project: Project): Promise<Project> {
     .toArray();
   return {
     ...project,
+    // Projects created before this field existed have no value stored.
+    isMaintenable: project.isMaintenable ?? false,
     progress: phases.length
       ? Math.round((phases.filter((p) => p.completed).length / phases.length) * 100)
       : project.progress,
@@ -90,6 +92,7 @@ export async function createProject(context: Context, input: ProjectInput) {
     technology_stack: null,
     lead_id: null,
     maintainer_id: null,
+    isMaintenable: false,
     status: "planning",
     priority: "medium",
     ...input,

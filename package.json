@@ -14,7 +14,8 @@
     "db:test": "node --env-file=.env scripts/test-mongodb.mjs",
     "db:setup": "node --env-file=.env scripts/setup-mongodb.mjs",
     "db:create-admin": "node --env-file=.env scripts/create-admin.mjs",
-    "db:reset-password": "node --env-file=.env scripts/reset-password.mjs"
+    "db:reset-password": "node --env-file=.env scripts/reset-password.mjs",
+    "db:migrate-roles": "node --env-file=.env scripts/migrate-roles.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
