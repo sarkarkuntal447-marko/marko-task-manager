@@ -7,7 +7,7 @@ const text = z.string().trim().max(10000);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const priority = z.enum(["low", "medium", "high", "critical"]);
 const taskStatus = z.enum(["pending", "in_progress", "blocked", "testing", "completed"]);
-const role = z.enum(["developer", "moderator", "admin", "super_admin"]);
+const role = z.enum(["Developer", "SEO", "Admin", "Super_Admin"]);
 const srv = () => import("./app.server");
 
 // ---- auth (login/logout/session are the only unauthenticated entry points) ----
@@ -39,7 +39,7 @@ export const createUser = createServerFn({ method: "POST" })
         email: z.string().email(),
         password: z.string().min(6).max(200),
         full_name: z.string().trim().min(1).max(200),
-        role: role.default("developer"),
+        role: role.default("Developer"),
         designation: z.string().trim().max(200).optional(),
         department: z.string().trim().max(200).optional(),
       })

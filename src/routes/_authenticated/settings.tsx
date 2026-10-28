@@ -27,19 +27,20 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { useServerFn } from "@tanstack/react-start";
 import { FormCardSkeleton, ListRowsSkeleton } from "@/components/skeletons";
 import type { AppRole, Availability } from "@/lib/types";
+import { availabilityLabel } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — Marko Projects" }] }),
   component: SettingsPage,
 });
 
-const ROLES = ["developer", "moderator", "admin", "super_admin"] as const;
+const ROLES = ["Developer", "SEO", "Admin", "Super_Admin"] as const;
 const AVAILABILITY = ["available", "busy", "on_leave"] as const;
 
 function SettingsPage() {
   const { data: me } = useCurrentUser();
-  const isSuper = me?.role === "super_admin";
-  const isAdmin = isSuper || me?.role === "admin";
+  const isSuper = me?.role === "Super_Admin";
+  const isAdmin = isSuper || me?.role === "Admin";
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -156,7 +157,7 @@ function ProfileForm() {
             <SelectContent>
               {AVAILABILITY.map((a) => (
                 <SelectItem key={a} value={a}>
-                  {a.replace("_", " ")}
+                  {availabilityLabel(a)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -185,7 +186,7 @@ function AddUserForm({ canPromoteSuper }: { canPromoteSuper: boolean }) {
     full_name: "",
     designation: "",
     department: "",
-    role: "developer" as AppRole,
+    role: "Developer" as AppRole,
   });
 
   const m = useMutation({
@@ -198,7 +199,7 @@ function AddUserForm({ canPromoteSuper }: { canPromoteSuper: boolean }) {
         full_name: "",
         designation: "",
         department: "",
-        role: "developer" as AppRole,
+        role: "Developer" as AppRole,
       });
       qc.invalidateQueries({ queryKey: ["all-members-roles"] });
       qc.invalidateQueries({ queryKey: ["team-members"] });
@@ -206,7 +207,7 @@ function AddUserForm({ canPromoteSuper }: { canPromoteSuper: boolean }) {
     onError: (e: Error) => toast.error(e.message ?? "Failed to create user"),
   });
 
-  const allowed = canPromoteSuper ? ROLES : ROLES.filter((r) => r !== "super_admin");
+  const allowed = canPromoteSuper ? ROLES : ROLES.filter((r) => r !== "Super_Admin");
 
   return (
     <Card className="p-4 sm:p-6">

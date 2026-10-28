@@ -32,6 +32,12 @@ export const priorityColor = (p: string): string =>
     critical: "bg-destructive/10 text-destructive",
   })[p] ?? "bg-muted text-muted-foreground";
 
+export const availabilityLabel = (a?: string | null): string =>
+  a ? a.charAt(0).toUpperCase() + a.slice(1).replace("_", " ") : "";
+
+export const maintenableColor = (m: boolean): string =>
+  m ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive";
+
 export const fmtDate = (d?: string | null) =>
   d
     ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })

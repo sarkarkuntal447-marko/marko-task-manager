@@ -28,7 +28,7 @@ import type {
 
 const normEmail = (email: string) => email.trim().toLowerCase();
 const primaryRole = (roles: AppRole[]): AppRole =>
-  (["super_admin", "admin", "moderator"] as const).find((r) => roles.includes(r)) ?? "developer";
+  (["Super_Admin", "Admin", "SEO"] as const).find((r) => roles.includes(r)) ?? "Developer";
 
 // ---------- auth ----------
 export async function login(emailInput: string, password: string) {
@@ -75,7 +75,7 @@ export async function createUser(
 ) {
   await requireRole(context);
   const callerRoles = await rolesOf(context.userId);
-  if (input.role === "super_admin" && !callerRoles.includes("super_admin")) {
+  if (input.role === "Super_Admin" && !callerRoles.includes("Super_Admin")) {
     throw new Error("Only super admin can create super admin");
   }
   const db = await getDb();
@@ -415,7 +415,7 @@ export async function createDailyLog(
 // ---------- remove an account ----------
 export async function deleteUser(context: Context, targetId: string) {
   // Only a super admin may delete accounts. Admins cannot.
-  await requireRole(context, ["super_admin"]);
+  await requireRole(context, ["Super_Admin"]);
   if (targetId === context.userId) throw new Error("You cannot delete your own account.");
   const db = await getDb();
   const target = await db.collection<UserDoc>("users").findOne({ id: targetId });
@@ -424,13 +424,13 @@ export async function deleteUser(context: Context, targetId: string) {
     rolesOf(context.userId, db),
     rolesOf(targetId, db),
   ]);
-  const callerIsSuper = callerRoles.includes("super_admin");
-  if ((targetRoles.includes("admin") || targetRoles.includes("super_admin")) && !callerIsSuper) {
+  const callerIsSuper = callerRoles.includes("Super_Admin");
+  if ((targetRoles.includes("Admin") || targetRoles.includes("Super_Admin")) && !callerIsSuper) {
     throw new Error("Only a super admin can delete an admin or super admin account.");
   }
   if (
-    targetRoles.includes("super_admin") &&
-    (await db.collection<UserRoleDoc>("user_roles").countDocuments({ role: "super_admin" })) <= 1
+    targetRoles.includes("Super_Admin") &&
+    (await db.collection<UserRoleDoc>("user_roles").countDocuments({ role: "Super_Admin" })) <= 1
   ) {
     throw new Error("You cannot delete the last super admin.");
   }
@@ -460,7 +460,7 @@ export async function deleteUser(context: Context, targetId: string) {
 
 // ---------- roles (super admin only) ----------
 export async function listRoleMembers(context: Context) {
-  await requireRole(context, ["super_admin"]);
+  await requireRole(context, ["Super_Admin"]);
   const db = await getDb();
   const [profiles, roles] = await Promise.all([
     db
@@ -474,7 +474,7 @@ export async function listRoleMembers(context: Context) {
 }
 
 export async function addRole(context: Context, userId: string, role: AppRole) {
-  await requireRole(context, ["super_admin"]);
+  await requireRole(context, ["Super_Admin"]);
   await checkUsers([userId]);
   const db = await getDb();
   if (await db.collection<UserRoleDoc>("user_roles").findOne({ user_id: userId, role }))
@@ -495,12 +495,12 @@ export async function addRole(context: Context, userId: string, role: AppRole) {
 }
 
 export async function removeRole(context: Context, id: string) {
-  await requireRole(context, ["super_admin"]);
+  await requireRole(context, ["Super_Admin"]);
   const db = await getDb();
   const roles = db.collection<UserRoleDoc>("user_roles");
   const doc = await roles.findOne({ id });
   if (!doc) throw new Error("Role not found.");
-  if (doc.role === "super_admin" && (await roles.countDocuments({ role: "super_admin" })) <= 1) {
+  if (doc.role === "Super_Admin" && (await roles.countDocuments({ role: "Super_Admin" })) <= 1) {
     throw new Error("You cannot remove the last super admin.");
   }
   await roles.deleteOne({ id });

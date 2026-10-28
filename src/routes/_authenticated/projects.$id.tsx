@@ -59,7 +59,7 @@ import {
 import { toast } from "sonner";
 import { ProjectTimeline } from "@/components/project-timeline";
 import { ProjectDetailSkeleton, ListRowsSkeleton } from "@/components/skeletons";
-import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
+import { statusLabel, statusColor, priorityColor, maintenableColor, fmtDate } from "@/lib/format";
 import { useCurrentUser, canManageProjects, canAssignTasks } from "@/hooks/use-current-user";
 import type { PhaseDoc, ProjectDoc, Priority, PhaseStatus, TaskStatus } from "@/lib/types";
 
@@ -288,6 +288,34 @@ function ProjectDetail() {
               >
                 Archive Project
               </Button>
+              <Select
+                value={project.isMaintenable ? "yes" : "no"}
+                onValueChange={(v) =>
+                  saveProjectChange({ isMaintenable: v === "yes" }, "Maintenance updated")
+                }
+              >
+                <SelectTrigger
+                  className={`w-full sm:w-44 font-medium ${
+                    project.isMaintenable
+                      ? "bg-success/15 text-success border-success/40"
+                      : "bg-destructive/10 text-destructive border-destructive/40"
+                  }`}
+                >
+                  Maintenable
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">
+                    <Badge variant="secondary" className={maintenableColor(true)}>
+                      Yes
+                    </Badge>
+                  </SelectItem>
+                  <SelectItem value="no">
+                    <Badge variant="secondary" className={maintenableColor(false)}>
+                      No
+                    </Badge>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={project.status} onValueChange={(v) => updateStatus.mutate(v)}>
                 <SelectTrigger className="w-full sm:w-48">
                   <SelectValue />

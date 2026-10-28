@@ -34,7 +34,7 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { Plus, FolderKanban, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
+import { statusLabel, statusColor, priorityColor, maintenableColor, fmtDate } from "@/lib/format";
 import { NewTaskDialog } from "@/components/new-task-dialog";
 import { GanttChart } from "@/components/gantt-chart";
 import { ArchivedProjects } from "@/components/archived-projects";
@@ -201,9 +201,10 @@ function ProjectsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
+                  <TableHead className="text-center">Project</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-center">Priority</TableHead>
+                  <TableHead className="hidden sm:table-cell text-center">Maintenance</TableHead>
                   <TableHead className="hidden sm:table-cell">Progress</TableHead>
                   <TableHead className="hidden md:table-cell">Due Date</TableHead>
                   <TableHead className="hidden lg:table-cell">Client</TableHead>
@@ -223,14 +224,19 @@ function ProjectsPage() {
                         {p.description || "No description"}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Badge variant="secondary" className={statusColor(p.status)}>
                         {statusLabel(p.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Badge variant="secondary" className={priorityColor(p.priority)}>
                         {p.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-center">
+                      <Badge variant="secondary" className={maintenableColor(p.isMaintenable)}>
+                        {p.isMaintenable ? "Yes" : "No"}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">

@@ -5,8 +5,8 @@ import { getDb } from "./mongodb.server";
 import type { ActivityDoc, AppRole, ProfileDoc, UserRoleDoc } from "./types";
 
 export type Context = { userId: string };
-export const ADMINS: AppRole[] = ["admin", "super_admin"];
-export const STAFF: AppRole[] = [...ADMINS, "moderator"];
+export const ADMINS: AppRole[] = ["Admin", "Super_Admin"];
+export const STAFF: AppRole[] = [...ADMINS, "SEO"];
 export const now = () => new Date().toISOString();
 
 export async function rolesOf(userId: string, db?: Db): Promise<AppRole[]> {

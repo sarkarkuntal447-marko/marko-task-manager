@@ -51,6 +51,7 @@ export const projectSchema = z
     technology_stack: z.array(z.string().trim().min(1).max(100)).max(100).nullable().optional(),
     lead_id: userId.optional(),
     maintainer_id: userId.optional(),
+    isMaintenable: z.boolean().optional(),
   })
   .strict();
 export const phaseSchema = z

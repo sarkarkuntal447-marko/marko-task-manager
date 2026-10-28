@@ -1,5 +1,5 @@
 // Shared document shapes for the MongoDB collections (replaces the generated Supabase types).
-export type AppRole = "super_admin" | "admin" | "moderator" | "developer";
+export type AppRole = "Super_Admin" | "Admin" | "SEO" | "Developer";
 export type Priority = "low" | "medium" | "high" | "critical";
 export type TaskStatus = "pending" | "in_progress" | "blocked" | "testing" | "completed";
 export type PhaseStatus = "not_started" | "in_progress" | "completed" | "blocked";
@@ -66,6 +66,7 @@ export interface ProjectDoc {
   created_by: string | null;
   lead_id: string | null;
   maintainer_id: string | null;
+  isMaintenable: boolean;
   created_at: string;
   updated_at: string;
   archived_at?: string | null;
