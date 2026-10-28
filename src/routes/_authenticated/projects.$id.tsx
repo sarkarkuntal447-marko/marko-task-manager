@@ -248,6 +248,8 @@ function ProjectDetail() {
   const safeTasks = Array.isArray(tasks) ? tasks : [];
   const memberIds = safeProjectMembers.map((m) => m.user_id).filter(Boolean);
   const workingMembers = safeMembers.filter((m) => memberIds.includes(m.id));
+  // Members assigned to this project may add phases and edit/archive it, alongside admins.
+  const canEditProject = canManage || (!!me?.user.id && memberIds.includes(me.user.id));
   const sto = safeMembers.find((m) => m.id === project.lead_id);
   const maintainer = safeMembers.find((m) => m.id === project.maintainer_id);
 
@@ -271,7 +273,7 @@ function ProjectDetail() {
           <p className="text-muted-foreground mt-1 max-w-3xl break-words">{project.description}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          {canManage && (
+          {canEditProject && (
             <>
               <EditProjectDialog
                 project={project}
@@ -407,9 +409,9 @@ function ProjectDetail() {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h3 className="font-semibold">Project Phases</h3>
-              {canManage && (
+              {canEditProject && (
                 <div className="flex gap-2 flex-wrap">
-                  {safePhases.length === 0 && (
+                  {canManage && safePhases.length === 0 && (
                     <Button variant="outline" onClick={() => seedPhases.mutate()}>
                       Seed Default Phases
                     </Button>

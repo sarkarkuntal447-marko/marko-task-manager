@@ -1,10 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { getMember } from "@/lib/app.functions";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { getMember, updateMemberProfile } from "@/lib/app.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Briefcase, Calendar, Crown, Wrench } from "lucide-react";
+import { ArrowLeft, Briefcase, Calendar, Crown, Pencil, Wrench } from "lucide-react";
 import { statusLabel, statusColor, priorityColor, availabilityLabel, fmtDate } from "@/lib/format";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { MemberDetailSkeleton } from "@/components/skeletons";
@@ -89,6 +102,11 @@ function MemberDetail() {
               </p>
             )}
           </div>
+          {detail?.canEdit && (
+            <div className="self-start ml-auto">
+              <EditMemberDialog member={member} />
+            </div>
+          )}
         </div>
       </Card>
 
@@ -147,6 +165,100 @@ function MemberDetail() {
         />
       </div>
     </div>
+  );
+}
+
+type Member = NonNullable<Awaited<ReturnType<typeof getMember>>>["member"];
+
+function EditMemberDialog({ member }: { member: Member }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const initial = () => ({
+    full_name: member.full_name ?? "",
+    designation: member.designation ?? "",
+    department: member.department ?? "",
+    phone: member.phone ?? "",
+  });
+  const [form, setForm] = useState(initial);
+  const update = (k: keyof typeof form, v: string) => setForm((s) => ({ ...s, [k]: v }));
+
+  const save = useMutation({
+    mutationFn: () =>
+      updateMemberProfile({
+        data: {
+          id: member.id,
+          changes: {
+            full_name: form.full_name.trim(),
+            designation: form.designation.trim() || null,
+            department: form.department.trim() || null,
+            phone: form.phone.trim() || null,
+          },
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Profile updated");
+      qc.invalidateQueries({ queryKey: ["team-member", member.id] });
+      qc.invalidateQueries({ queryKey: ["team-members"] });
+      qc.invalidateQueries({ queryKey: ["members"] });
+      qc.invalidateQueries({ queryKey: ["current-user"] });
+      setOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        // Refill from the latest saved values each time the form opens.
+        if (o) setForm(initial());
+        setOpen(o);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Pencil className="h-4 w-4 mr-2" />
+          Edit
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Edit Member</DialogTitle>
+        </DialogHeader>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Full name</Label>
+            <Input value={form.full_name} onChange={(e) => update("full_name", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Designation</Label>
+            <Input
+              value={form.designation}
+              onChange={(e) => update("designation", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Department</Label>
+            <Input
+              value={form.department}
+              onChange={(e) => update("department", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Phone</Label>
+            <Input value={form.phone} onChange={(e) => update("phone", e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            disabled={!form.full_name.trim() || save.isPending}
+            onClick={() => save.mutate()}
+          >
+            {save.isPending ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

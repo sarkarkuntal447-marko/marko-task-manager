@@ -83,6 +83,29 @@ export const getMember = createServerFn({ method: "GET" })
   .validator((d: unknown) => z.object({ id }).strict().parse(d))
   .handler(async ({ data, context }) => (await srv()).getMember(context, data.id));
 
+// Admins may edit any member; everyone else only themselves.
+export const updateMemberProfile = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .validator((d: unknown) =>
+    z
+      .object({
+        id,
+        changes: z
+          .object({
+            full_name: text.min(1).max(200),
+            designation: text.max(200).nullable(),
+            department: text.max(200).nullable(),
+            phone: text.max(50).nullable(),
+          })
+          .strict(),
+      })
+      .strict()
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    (await srv()).updateMemberProfile(context, data.id, data.changes),
+  );
+
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => (await srv()).getDashboard(context));

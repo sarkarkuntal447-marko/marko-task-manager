@@ -185,12 +185,37 @@ export async function getMember(context: Context, id: string) {
   const db = await getDb();
   const member = (await teamDirectory(context)).find((m) => m.id === id) ?? null;
   if (!member) return null;
-  const [tasks, projects, memberships] = await Promise.all([
+  const canEdit = context.userId === id || (await hasAnyRole(context.userId, ADMINS));
+  const [tasks, projects, memberships, private_] = await Promise.all([
     listAllTasks({ assigned_to: id }),
     listProjects(),
     db.collection<ProjectMemberDoc>("project_members").find({ user_id: id }).toArray(),
+    // Phone stays private: only the member themselves and admins (who may edit it) receive it.
+    canEdit
+      ? db.collection<ProfileDoc>("profiles").findOne({ id }, { projection: { _id: 0, phone: 1 } })
+      : null,
   ]);
-  return { member, tasks, projects, memberships: memberships.map((m) => m.project_id) };
+  return {
+    member: { ...member, phone: private_?.phone ?? null },
+    canEdit,
+    tasks,
+    projects,
+    memberships: memberships.map((m) => m.project_id),
+  };
+}
+
+export async function updateMemberProfile(
+  context: Context,
+  id: string,
+  changes: Partial<Pick<ProfileDoc, "full_name" | "designation" | "department" | "phone">>,
+) {
+  if (context.userId !== id) await requireRole(context);
+  const db = await getDb();
+  const result = await db
+    .collection<ProfileDoc>("profiles")
+    .updateOne({ id }, { $set: { ...changes, updated_at: now() } });
+  if (!result.matchedCount) throw new Error("Member not found.");
+  return { id };
 }
 
 export async function getDashboard(context: Context) {

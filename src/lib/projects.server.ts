@@ -4,7 +4,9 @@ import { ObjectId, type Db, type WithId } from "mongodb";
 import type { z } from "zod";
 import type { SubPhaseDoc, PhaseDoc, ProjectDoc, ProjectMemberDoc, TaskDoc } from "./types";
 import {
+  ADMINS,
   STAFF,
+  hasAnyRole,
   logActivity,
   now,
   requireRole,
@@ -40,6 +42,15 @@ async function projectDoc(db: Db, id: string) {
   }
   if (!doc) throw new Error("Project not found.");
   return doc;
+}
+
+/** Admins, or members assigned to the project ("Currently Working On"). */
+async function requireAdminOrMember(context: Context, db: Db, projectId: string) {
+  if (await hasAnyRole(context.userId, ADMINS)) return;
+  const member = await db
+    .collection<Member>("project_members")
+    .findOne({ project_id: projectId, user_id: context.userId });
+  if (!member) throw new Error("You do not have permission to make this change.");
 }
 
 async function progress(db: Db, project: Project): Promise<Project> {
@@ -108,10 +119,10 @@ export async function createProject(context: Context, input: ProjectInput) {
 }
 
 export async function updateProject(context: Context, id: string, changes: Partial<ProjectInput>) {
-  await requireRole(context);
   await checkUserIds([changes.lead_id, changes.maintainer_id]);
   const db = await getDb();
   const doc = await projectDoc(db, id);
+  await requireAdminOrMember(context, db, id);
   await db
     .collection<Project>("projects")
     .updateOne({ _id: doc._id, archived_at: null }, { $set: { ...changes, updated_at: now() } });
@@ -119,9 +130,9 @@ export async function updateProject(context: Context, id: string, changes: Parti
 }
 
 export async function archiveProject(context: Context, id: string) {
-  await requireRole(context);
   const db = await getDb();
   const doc = await projectDoc(db, id);
+  await requireAdminOrMember(context, db, id);
   const timestamp = now();
   await db
     .collection<Project>("projects")
@@ -171,10 +182,10 @@ export async function listProjectPhases(projectId: string): Promise<Phase[]> {
 }
 
 export async function createProjectPhase(context: Context, projectId: string, input: PhaseInput) {
-  await requireRole(context);
   await checkUserIds([input.assigned_to]);
   const db = await getDb();
   await projectDoc(db, projectId);
+  await requireAdminOrMember(context, db, projectId);
   const last = await db
     .collection<Phase>("project_phases")
     .findOne({ project_id: projectId }, { sort: { position: -1 } });
