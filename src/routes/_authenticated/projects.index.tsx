@@ -138,7 +138,7 @@ function ProjectsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="all">All status</SelectItem>
               <SelectItem value="active">Active projects</SelectItem>
               <SelectItem value="delayed">Delayed projects</SelectItem>
               {STATUSES.map((s) => (
@@ -391,9 +391,9 @@ function NewProjectDialog({
               expected_delivery_date: form.expected_delivery_date || null,
               technology_stack: form.technology_stack
                 ? form.technology_stack
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
                 : null,
             })
           }
