@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, Briefcase, Calendar, Crown, Pencil, Wrench } from "lucide-react";
 import { statusLabel, statusColor, priorityColor, availabilityLabel, fmtDate } from "@/lib/format";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { AvailabilityIcon } from "@/components/availability-status";
 import { MemberDetailSkeleton } from "@/components/skeletons";
 
 export const Route = createFileRoute("/_authenticated/team/$id")({
@@ -94,7 +95,10 @@ function MemberDetail() {
                   <Calendar className="h-3 w-3" /> joined {fmtDate(member.joining_date)}
                 </span>
               )}
-              <Badge variant="secondary">{availabilityLabel(member.availability)}</Badge>
+              <Badge variant="secondary" className="gap-1.5">
+                <AvailabilityIcon value={member.availability} className="h-3.5 w-3.5" />
+                {availabilityLabel(member.availability)}
+              </Badge>
             </div>
             {!isStaff && (
               <p className="text-xs text-muted-foreground mt-2 italic">
@@ -239,10 +243,7 @@ function EditMemberDialog({ member }: { member: Member }) {
           </div>
           <div className="space-y-2">
             <Label>Department</Label>
-            <Input
-              value={form.department}
-              onChange={(e) => update("department", e.target.value)}
-            />
+            <Input value={form.department} onChange={(e) => update("department", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Phone</Label>
@@ -250,10 +251,7 @@ function EditMemberDialog({ member }: { member: Member }) {
           </div>
         </div>
         <DialogFooter>
-          <Button
-            disabled={!form.full_name.trim() || save.isPending}
-            onClick={() => save.mutate()}
-          >
+          <Button disabled={!form.full_name.trim() || save.isPending} onClick={() => save.mutate()}>
             {save.isPending ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>

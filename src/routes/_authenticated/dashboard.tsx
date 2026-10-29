@@ -80,7 +80,8 @@ function DashboardPage() {
 
   const employees = profiles.length;
   const activeEmployees = profiles.filter(
-    (p) => p.availability === "available" || p.availability === "busy",
+    (p) =>
+      p.availability === "available" || p.availability === "busy" || p.availability === "focus",
   ).length;
 
   const statusCounts = projects.reduce<Record<string, number>>((a, p) => {

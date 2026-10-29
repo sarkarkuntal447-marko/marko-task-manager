@@ -21,6 +21,7 @@ import { Route as AuthenticatedProjectsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedTeamIndexRouteImport } from './routes/_authenticated/team.index'
 import { Route as AuthenticatedTeamIdRouteImport } from './routes/_authenticated/team.$id'
+import { Route as AuthenticatedTeamMembersRouteImport } from './routes/_authenticated/team.members'
 import { Route as AuthenticatedProjectsIdPhasesPhaseIdRouteImport } from './routes/_authenticated/projects.$id_.phases.$phaseId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -83,6 +84,12 @@ const AuthenticatedTeamIdRoute = AuthenticatedTeamIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedTeamRoute,
 } as any)
+const AuthenticatedTeamMembersRoute =
+  AuthenticatedTeamMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => AuthenticatedTeamRoute,
+  } as any)
 const AuthenticatedProjectsIdPhasesPhaseIdRoute =
   AuthenticatedProjectsIdPhasesPhaseIdRouteImport.update({
     id: '/projects/$id_/phases/$phaseId',
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/team': typeof AuthenticatedTeamRouteWithChildren
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/team/$id': typeof AuthenticatedTeamIdRoute
+  '/team/members': typeof AuthenticatedTeamMembersRoute
   '/projects/': typeof AuthenticatedProjectsIndexRoute
   '/team/': typeof AuthenticatedTeamIndexRoute
   '/projects/$id/phases/$phaseId': typeof AuthenticatedProjectsIdPhasesPhaseIdRoute
@@ -113,6 +121,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof AuthenticatedTasksRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/team/$id': typeof AuthenticatedTeamIdRoute
+  '/team/members': typeof AuthenticatedTeamMembersRoute
   '/projects': typeof AuthenticatedProjectsIndexRoute
   '/team': typeof AuthenticatedTeamIndexRoute
   '/projects/$id/phases/$phaseId': typeof AuthenticatedProjectsIdPhasesPhaseIdRoute
@@ -129,6 +138,7 @@ export interface FileRoutesById {
   '/_authenticated/team': typeof AuthenticatedTeamRouteWithChildren
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/_authenticated/team/$id': typeof AuthenticatedTeamIdRoute
+  '/_authenticated/team/members': typeof AuthenticatedTeamMembersRoute
   '/_authenticated/projects/': typeof AuthenticatedProjectsIndexRoute
   '/_authenticated/team/': typeof AuthenticatedTeamIndexRoute
   '/_authenticated/projects/$id_/phases/$phaseId': typeof AuthenticatedProjectsIdPhasesPhaseIdRoute
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/projects/$id'
     | '/team/$id'
+    | '/team/members'
     | '/projects/'
     | '/team/'
     | '/projects/$id/phases/$phaseId'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/projects/$id'
     | '/team/$id'
+    | '/team/members'
     | '/projects'
     | '/team'
     | '/projects/$id/phases/$phaseId'
@@ -173,6 +185,7 @@ export interface FileRouteTypes {
     | '/_authenticated/team'
     | '/_authenticated/projects/$id'
     | '/_authenticated/team/$id'
+    | '/_authenticated/team/members'
     | '/_authenticated/projects/'
     | '/_authenticated/team/'
     | '/_authenticated/projects/$id_/phases/$phaseId'
@@ -270,6 +283,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTeamIdRouteImport
       parentRoute: typeof AuthenticatedTeamRoute
     }
+    '/_authenticated/team/members': {
+      id: '/_authenticated/team/members'
+      path: '/members'
+      fullPath: '/team/members'
+      preLoaderRoute: typeof AuthenticatedTeamMembersRouteImport
+      parentRoute: typeof AuthenticatedTeamRoute
+    }
     '/_authenticated/projects/$id_/phases/$phaseId': {
       id: '/_authenticated/projects/$id_/phases/$phaseId'
       path: '/projects/$id/phases/$phaseId'
@@ -282,11 +302,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedTeamRouteChildren {
   AuthenticatedTeamIdRoute: typeof AuthenticatedTeamIdRoute
+  AuthenticatedTeamMembersRoute: typeof AuthenticatedTeamMembersRoute
   AuthenticatedTeamIndexRoute: typeof AuthenticatedTeamIndexRoute
 }
 
 const AuthenticatedTeamRouteChildren: AuthenticatedTeamRouteChildren = {
   AuthenticatedTeamIdRoute: AuthenticatedTeamIdRoute,
+  AuthenticatedTeamMembersRoute: AuthenticatedTeamMembersRoute,
   AuthenticatedTeamIndexRoute: AuthenticatedTeamIndexRoute,
 }
 

@@ -3,7 +3,10 @@ export type AppRole = "Super_Admin" | "Admin" | "SEO" | "Developer";
 export type Priority = "low" | "medium" | "high" | "critical";
 export type TaskStatus = "pending" | "in_progress" | "blocked" | "testing" | "completed";
 export type PhaseStatus = "not_started" | "in_progress" | "completed" | "blocked";
-export type Availability = "available" | "busy" | "on_leave";
+export const AVAILABILITY = ["available", "busy", "on_leave", "focus"] as const;
+export type Availability = (typeof AVAILABILITY)[number];
+export const DEPARTMENTS = ["Tech", "SEO", "Tech & SEO"] as const;
+export type Department = (typeof DEPARTMENTS)[number];
 export type ProjectStatus =
   | "planning"
   | "requirement_gathering"
@@ -25,6 +28,8 @@ export interface UserDoc {
   id: string;
   email: string;
   password_hash: string;
+  /** false = disabled by an admin (cannot sign in). Missing means active. */
+  active?: boolean;
   created_at: string;
 }
 export interface ProfileDoc {

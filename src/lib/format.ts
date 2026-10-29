@@ -1,3 +1,5 @@
+import type { Availability, Department } from "./types";
+
 export const statusLabel = (s: string) =>
   s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -32,8 +34,19 @@ export const priorityColor = (p: string): string =>
     critical: "bg-destructive/10 text-destructive",
   })[p] ?? "bg-muted text-muted-foreground";
 
+const AVAILABILITY_LABEL: Record<Availability, string> = {
+  available: "Available",
+  busy: "Busy",
+  on_leave: "On Leave",
+  focus: "Focus",
+};
+
 export const availabilityLabel = (a?: string | null): string =>
-  a ? a.charAt(0).toUpperCase() + a.slice(1).replace("_", " ") : "";
+  a ? (AVAILABILITY_LABEL[a as Availability] ?? a) : "";
+
+/** Status icon shipped in /public/statuses (e.g. on_leave → status-on-leave.svg). */
+export const availabilityIcon = (a?: string | null): string =>
+  `/statuses/status-${(a && a in AVAILABILITY_LABEL ? a : "available").replace("_", "-")}.svg`;
 
 export const maintenableColor = (m: boolean): string =>
   m ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive";
@@ -42,3 +55,16 @@ export const fmtDate = (d?: string | null) =>
   d
     ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
     : "—";
+
+export type DepartmentFilterValue = "all" | "none" | Department;
+
+/** True when a member's department passes the selected filter ("none" = not set). */
+export function matchesDepartment(
+  department: string | null | undefined,
+  filter: DepartmentFilterValue,
+) {
+  const d = department?.trim() ?? "";
+  if (filter === "all") return true;
+  if (filter === "none") return !d;
+  return d.toLowerCase() === filter.toLowerCase();
+}

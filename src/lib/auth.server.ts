@@ -88,7 +88,9 @@ export async function currentUserId(): Promise<string | null> {
   const id = token ? verifySession(token) : null;
   if (!id) return null;
   const db = await getDb();
-  return (await db.collection<UserDoc>("users").findOne({ id }, { projection: { id: 1 } }))
-    ? id
-    : null;
+  const user = await db
+    .collection<UserDoc>("users")
+    .findOne({ id }, { projection: { id: 1, active: 1 } });
+  // Disabled accounts lose their session immediately.
+  return user && user.active !== false ? id : null;
 }

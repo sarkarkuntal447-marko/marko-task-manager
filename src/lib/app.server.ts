@@ -37,6 +37,8 @@ export async function login(emailInput: string, password: string) {
   // Same message for unknown email and wrong password.
   if (!user || !(await verifyPassword(password, user.password_hash)))
     throw new Error("Invalid email or password.");
+  if (user.active === false)
+    throw new Error("Your account has been disabled. Please contact an admin.");
   setSessionCookie(signSession(user.id));
   return { id: user.id };
 }
@@ -73,11 +75,8 @@ export async function createUser(
     department?: string;
   },
 ) {
-  await requireRole(context);
-  const callerRoles = await rolesOf(context.userId);
-  if (input.role === "Super_Admin" && !callerRoles.includes("Super_Admin")) {
-    throw new Error("Only super admin can create super admin");
-  }
+  // Only a super admin may add members.
+  await requireRole(context, ["Super_Admin"]);
   const db = await getDb();
   const email = normEmail(input.email);
   if (await db.collection<UserDoc>("users").findOne({ email }))
@@ -88,6 +87,7 @@ export async function createUser(
     id,
     email,
     password_hash: await hashPassword(input.password),
+    active: true,
     created_at: timestamp,
   });
   const profile: ProfileDoc = {
@@ -160,23 +160,21 @@ export async function teamDirectory(context: Context) {
 
 export async function teamWithWorkload(context: Context) {
   const db = await getDb();
-  const [members, open] = await Promise.all([
+  const [members, disabled] = await Promise.all([
     teamDirectory(context),
     db
-      .collection<TaskDoc>("tasks")
-      .aggregate<{ _id: string; n: number }>([
-        { $match: { status: { $ne: "completed" }, assigned_to: { $ne: null } } },
-        { $group: { _id: "$assigned_to", n: { $sum: 1 } } },
-      ])
+      .collection<UserDoc>("users")
+      .find({ active: false }, { projection: { id: 1 } })
       .toArray(),
   ]);
-  const counts = new Map(open.map((o) => [o._id, o.n]));
+  // Disabled accounts stay in the list but are marked Non-Active on their card.
+  const disabledIds = new Set(disabled.map((u) => u.id));
   // Roles are only sent to admins (they need them to decide who they may remove).
   const isAdmin = await hasAnyRole(context.userId, ADMINS);
   const roleRows = isAdmin ? await db.collection<UserRoleDoc>("user_roles").find({}).toArray() : [];
   return members.map((m) => ({
     ...m,
-    activeTasks: counts.get(m.id) ?? 0,
+    active: !disabledIds.has(m.id),
     roles: isAdmin ? roleRows.filter((r) => r.user_id === m.id).map((r) => r.role) : undefined,
   }));
 }
@@ -185,13 +183,15 @@ export async function getMember(context: Context, id: string) {
   const db = await getDb();
   const member = (await teamDirectory(context)).find((m) => m.id === id) ?? null;
   if (!member) return null;
-  const canEdit = context.userId === id || (await hasAnyRole(context.userId, ADMINS));
+  // Only a super admin edits member profiles here (members edit their own in Settings).
+  const canEdit = await hasAnyRole(context.userId, ["Super_Admin"]);
+  const canSeePhone = context.userId === id || (await hasAnyRole(context.userId, ADMINS));
   const [tasks, projects, memberships, private_] = await Promise.all([
     listAllTasks({ assigned_to: id }),
     listProjects(),
     db.collection<ProjectMemberDoc>("project_members").find({ user_id: id }).toArray(),
-    // Phone stays private: only the member themselves and admins (who may edit it) receive it.
-    canEdit
+    // Phone stays private: only the member themselves and admins receive it.
+    canSeePhone
       ? db.collection<ProfileDoc>("profiles").findOne({ id }, { projection: { _id: 0, phone: 1 } })
       : null,
   ]);
@@ -209,7 +209,7 @@ export async function updateMemberProfile(
   id: string,
   changes: Partial<Pick<ProfileDoc, "full_name" | "designation" | "department" | "phone">>,
 ) {
-  if (context.userId !== id) await requireRole(context);
+  await requireRole(context, ["Super_Admin"]);
   const db = await getDb();
   const result = await db
     .collection<ProfileDoc>("profiles")
@@ -378,63 +378,12 @@ export async function listActivity(opts: { since?: string; limit?: number }) {
   return rows.map(clean);
 }
 
-export async function listDailyLogs(context: Context, opts: { dates?: string[] }) {
-  const db = await getDb();
-  const staff = await hasAnyRole(context.userId, STAFF);
-  const filter: Record<string, unknown> = {};
-  if (!staff) filter.user_id = context.userId;
-  if (opts.dates) filter.log_date = { $in: opts.dates };
-  const logs = await db
-    .collection<DailyLogDoc>("daily_logs")
-    .find(filter)
-    .sort({ log_date: -1, created_at: -1 })
-    .toArray();
-  const projectIds = [...new Set(logs.map((l) => l.project_id).filter((x): x is string => !!x))];
-  const userIds = [...new Set(logs.map((l) => l.user_id))];
-  const [projects, profiles] = await Promise.all([
-    db
-      .collection<{ id: string; name: string }>("projects")
-      .find({ id: { $in: projectIds } }, { projection: { id: 1, name: 1 } })
-      .toArray(),
-    db
-      .collection<ProfileDoc>("profiles")
-      .find({ id: { $in: userIds } }, { projection: { id: 1, full_name: 1, email: 1 } })
-      .toArray(),
-  ]);
-  const pn = new Map(projects.map((p) => [p.id, p.name]));
-  const pr = new Map(profiles.map((p) => [p.id, p]));
-  return logs.map((l) => ({
-    ...clean(l),
-    projects: l.project_id && pn.has(l.project_id) ? { name: pn.get(l.project_id)! } : null,
-    profiles: pr.has(l.user_id)
-      ? { full_name: pr.get(l.user_id)!.full_name, email: pr.get(l.user_id)!.email }
-      : null,
-  }));
-}
-
-export async function createDailyLog(
+export async function listApplicationLogs(
   context: Context,
-  input: Pick<DailyLogDoc, "log_date" | "task_name"> &
-    Partial<Pick<DailyLogDoc, "project_id" | "priority" | "status" | "hours" | "notes">>,
+  opts: { since?: string; limit?: number },
 ) {
-  const db = await getDb();
-  const timestamp = now();
-  const log: DailyLogDoc = {
-    id: randomUUID(),
-    user_id: context.userId,
-    project_id: input.project_id ?? null,
-    task_id: null,
-    log_date: input.log_date,
-    task_name: input.task_name,
-    priority: input.priority ?? "medium",
-    status: input.status ?? "in_progress",
-    hours: input.hours ?? null,
-    notes: input.notes ?? null,
-    created_at: timestamp,
-    updated_at: timestamp,
-  };
-  await db.collection<DailyLogDoc>("daily_logs").insertOne(log);
-  return { id: log.id };
+  await requireRole(context);
+  return listActivity(opts);
 }
 
 // ---------- remove an account ----------
@@ -483,30 +432,53 @@ export async function deleteUser(context: Context, targetId: string) {
   return { id: targetId };
 }
 
-// ---------- roles (super admin only) ----------
-export async function listRoleMembers(context: Context) {
-  await requireRole(context, ["Super_Admin"]);
+// ---------- member management (everyone can view; only a super admin can change) ----------
+export async function listMembers(context: Context) {
   const db = await getDb();
-  const [profiles, roles] = await Promise.all([
+  // Emails follow the team directory rule: staff only.
+  const staff = await hasAnyRole(context.userId, STAFF);
+  const [profiles, roles, users] = await Promise.all([
     db
       .collection<ProfileDoc>("profiles")
-      .find({}, { projection: { _id: 0, ...directoryFields } })
+      .find({}, { projection: { _id: 0, ...directoryFields, ...(staff ? { email: 1 } : {}) } })
       .sort({ created_at: 1 })
       .toArray(),
     db.collection<UserRoleDoc>("user_roles").find({}).toArray(),
+    db
+      .collection<UserDoc>("users")
+      .find({}, { projection: { _id: 0, id: 1, active: 1 } })
+      .toArray(),
   ]);
-  return profiles.map((p) => ({ ...p, roles: roles.filter((r) => r.user_id === p.id).map(clean) }));
+  const disabled = new Set(users.filter((u) => u.active === false).map((u) => u.id));
+  return profiles.map((p) => ({
+    ...p,
+    role: primaryRole(roles.filter((r) => r.user_id === p.id).map((r) => r.role)),
+    active: !disabled.has(p.id),
+  }));
 }
 
-export async function addRole(context: Context, userId: string, role: AppRole) {
+/** Shared checks before changing someone's account: super admin only, never on yourself. */
+async function assertCanManage(context: Context, targetId: string) {
   await requireRole(context, ["Super_Admin"]);
-  await checkUsers([userId]);
+  if (targetId === context.userId) throw new Error("You cannot change your own account here.");
+  await checkUsers([targetId]);
   const db = await getDb();
-  if (await db.collection<UserRoleDoc>("user_roles").findOne({ user_id: userId, role }))
-    throw new Error("User already has this role.");
-  await db
-    .collection<UserRoleDoc>("user_roles")
-    .insertOne({ id: randomUUID(), user_id: userId, role, created_at: now() });
+  return { db, targetRoles: await rolesOf(targetId, db) };
+}
+
+// Every member has exactly one role; setting it replaces whatever they had before.
+export async function setMemberRole(context: Context, userId: string, role: AppRole) {
+  const { db, targetRoles } = await assertCanManage(context, userId);
+  const roles = db.collection<UserRoleDoc>("user_roles");
+  if (
+    role !== "Super_Admin" &&
+    targetRoles.includes("Super_Admin") &&
+    (await roles.countDocuments({ role: "Super_Admin" })) <= 1
+  ) {
+    throw new Error("You cannot remove the last super admin.");
+  }
+  await roles.deleteMany({ user_id: userId });
+  await roles.insertOne({ id: randomUUID(), user_id: userId, role, created_at: now() });
   const target = await db.collection<ProfileDoc>("profiles").findOne({ id: userId });
   await logActivity(
     context.userId,
@@ -516,18 +488,19 @@ export async function addRole(context: Context, userId: string, role: AppRole) {
     target?.full_name ?? target?.email ?? null,
     { role },
   );
-  return { userId };
+  return { userId, role };
 }
 
-export async function removeRole(context: Context, id: string) {
-  await requireRole(context, ["Super_Admin"]);
-  const db = await getDb();
-  const roles = db.collection<UserRoleDoc>("user_roles");
-  const doc = await roles.findOne({ id });
-  if (!doc) throw new Error("Role not found.");
-  if (doc.role === "Super_Admin" && (await roles.countDocuments({ role: "Super_Admin" })) <= 1) {
-    throw new Error("You cannot remove the last super admin.");
-  }
-  await roles.deleteOne({ id });
-  return { id };
+export async function setMemberActive(context: Context, userId: string, active: boolean) {
+  const { db } = await assertCanManage(context, userId);
+  await db.collection<UserDoc>("users").updateOne({ id: userId }, { $set: { active } });
+  const target = await db.collection<ProfileDoc>("profiles").findOne({ id: userId });
+  await logActivity(
+    context.userId,
+    active ? "member.enabled" : "member.disabled",
+    "profile",
+    userId,
+    target?.full_name ?? target?.email ?? null,
+  );
+  return { userId, active };
 }
