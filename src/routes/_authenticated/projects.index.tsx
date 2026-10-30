@@ -154,7 +154,8 @@ function ProjectsPage() {
               onAdded={() => qc.invalidateQueries({ queryKey: ["all-tasks"] })}
             />
           )}
-          {canManage && (
+          {/* Every signed-in user can create a project. */}
+          {canAdd && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -174,11 +175,7 @@ function ProjectsPage() {
         <Card className="p-12 text-center">
           <FolderKanban className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
           <h3 className="font-semibold">No projects yet</h3>
-          <p className="text-sm text-muted-foreground">
-            {canManage
-              ? "Create your first project to get started."
-              : "Wait for an admin to add a project."}
-          </p>
+          <p className="text-sm text-muted-foreground">Create your first project to get started.</p>
         </Card>
       ) : (
         <>
@@ -397,9 +394,9 @@ function NewProjectDialog({
               expected_delivery_date: form.expected_delivery_date || null,
               technology_stack: form.technology_stack
                 ? form.technology_stack
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean)
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
                 : null,
             })
           }

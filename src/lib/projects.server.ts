@@ -84,8 +84,8 @@ export async function getProject(id: string): Promise<Project> {
   return progress(db, plain(await projectDoc(db, id)));
 }
 
+// Any signed-in user may create a project.
 export async function createProject(context: Context, input: ProjectInput) {
-  await requireRole(context);
   await checkUserIds([input.lead_id, input.maintainer_id]);
   const db = await getDb();
   const timestamp = now();
@@ -114,6 +114,15 @@ export async function createProject(context: Context, input: ProjectInput) {
     archived_at: null,
   };
   await db.collection<Project>("projects").insertOne({ ...project });
+  // Non-admin creators join as a member so they can keep editing the project they made.
+  if (!(await hasAnyRole(context.userId, ADMINS))) {
+    await db.collection<Member>("project_members").insertOne({
+      id: randomUUID(),
+      project_id: project.id,
+      user_id: context.userId,
+      created_at: timestamp,
+    });
+  }
   await logActivity(context.userId, "project.created", "project", project.id, project.name);
   return { id: project.id };
 }

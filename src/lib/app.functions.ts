@@ -108,7 +108,7 @@ export const updateMemberProfile = createServerFn({ method: "POST" })
           .object({
             full_name: text.min(1).max(200),
             designation: text.max(200).nullable(),
-            department: text.max(200).nullable(),
+            department: z.enum(DEPARTMENTS).nullable(),
             phone: text.max(50).nullable(),
           })
           .strict(),

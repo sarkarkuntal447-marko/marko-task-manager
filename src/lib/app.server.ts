@@ -75,9 +75,11 @@ export async function createUser(
     department?: string;
   },
 ) {
-  // Only a super admin may add members.
-  await requireRole(context, ["Super_Admin"]);
+  // Admins and super admins may add members, but only a super admin may create a super admin.
+  await requireRole(context, ADMINS);
   const db = await getDb();
+  if (input.role === "Super_Admin" && !(await rolesOf(context.userId, db)).includes("Super_Admin"))
+    throw new Error("Only a super admin can make someone a super admin.");
   const email = normEmail(input.email);
   if (await db.collection<UserDoc>("users").findOne({ email }))
     throw new Error("A user with this email already exists.");
@@ -432,7 +434,7 @@ export async function deleteUser(context: Context, targetId: string) {
   return { id: targetId };
 }
 
-// ---------- member management (everyone can view; only a super admin can change) ----------
+// ---------- member management (everyone can view; admins and super admins can change) ----------
 export async function listMembers(context: Context) {
   const db = await getDb();
   // Emails follow the team directory rule: staff only.
@@ -457,18 +459,30 @@ export async function listMembers(context: Context) {
   }));
 }
 
-/** Shared checks before changing someone's account: super admin only, never on yourself. */
+/**
+ * Shared checks before changing someone's account: admins and super admins only, never on
+ * yourself, and only a super admin may touch a super admin's account.
+ */
 async function assertCanManage(context: Context, targetId: string) {
-  await requireRole(context, ["Super_Admin"]);
+  await requireRole(context, ADMINS);
   if (targetId === context.userId) throw new Error("You cannot change your own account here.");
   await checkUsers([targetId]);
   const db = await getDb();
-  return { db, targetRoles: await rolesOf(targetId, db) };
+  const [callerRoles, targetRoles] = await Promise.all([
+    rolesOf(context.userId, db),
+    rolesOf(targetId, db),
+  ]);
+  const callerIsSuper = callerRoles.includes("Super_Admin");
+  if (targetRoles.includes("Super_Admin") && !callerIsSuper)
+    throw new Error("Only a super admin can change a super admin's account.");
+  return { db, targetRoles, callerIsSuper };
 }
 
 // Every member has exactly one role; setting it replaces whatever they had before.
 export async function setMemberRole(context: Context, userId: string, role: AppRole) {
-  const { db, targetRoles } = await assertCanManage(context, userId);
+  const { db, targetRoles, callerIsSuper } = await assertCanManage(context, userId);
+  if (role === "Super_Admin" && !callerIsSuper)
+    throw new Error("Only a super admin can make someone a super admin.");
   const roles = db.collection<UserRoleDoc>("user_roles");
   if (
     role !== "Super_Admin" &&

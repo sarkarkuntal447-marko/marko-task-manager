@@ -79,9 +79,9 @@ function DashboardPage() {
   const completedTasks = tasks.filter((t) => t.status === "completed").length;
 
   const employees = profiles.length;
-  const activeEmployees = profiles.filter(
-    (p) =>
-      p.availability === "available" || p.availability === "busy" || p.availability === "focus",
+  // Everyone who is working today, whether in the office or from home.
+  const activeEmployees = profiles.filter((p) =>
+    ["available", "busy", "focus", "wfh"].includes(p.availability ?? ""),
   ).length;
 
   const statusCounts = projects.reduce<Record<string, number>>((a, p) => {

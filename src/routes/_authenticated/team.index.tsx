@@ -9,7 +9,7 @@ import { availabilityLabel } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Briefcase, Laptop } from "lucide-react";
+import { Briefcase, IdCardLanyard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AvailabilityIcon, WithStatus } from "@/components/availability-status";
 
@@ -23,6 +23,7 @@ const availabilityColor: Record<string, string> = {
   busy: "bg-destructive/10 text-destructive",
   on_leave: "bg-warning/20 text-warning-foreground",
   focus: "bg-destructive/10 text-destructive",
+  wfh: "bg-info/10 text-info",
 };
 
 function TeamPage() {
@@ -84,7 +85,7 @@ function TeamPage() {
                       <p className="font-semibold truncate">{display}</p>
                       <div className="mt-1 space-y-1 text-xs text-muted-foreground">
                         <p className="flex min-w-0 items-center gap-2">
-                          <Laptop className="h-3 w-3 shrink-0" />
+                          <IdCardLanyard className="h-3 w-3 shrink-0" />
                           <span className={cn("truncate", !m.designation?.trim() && "italic")}>
                             {m.designation?.trim() || "Not mentioned"}
                           </span>

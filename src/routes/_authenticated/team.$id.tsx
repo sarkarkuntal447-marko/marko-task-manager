@@ -16,6 +16,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DEPARTMENTS, type Department } from "@/lib/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, Briefcase, Calendar, Crown, Pencil, Wrench } from "lucide-react";
 import { statusLabel, statusColor, priorityColor, availabilityLabel, fmtDate } from "@/lib/format";
@@ -180,7 +188,10 @@ function EditMemberDialog({ member }: { member: Member }) {
   const initial = () => ({
     full_name: member.full_name ?? "",
     designation: member.designation ?? "",
-    department: member.department ?? "",
+    // Older free-text departments that aren't in the list start out unselected.
+    department: (DEPARTMENTS as readonly string[]).includes(member.department ?? "")
+      ? (member.department as Department)
+      : ("" as Department | ""),
     phone: member.phone ?? "",
   });
   const [form, setForm] = useState(initial);
@@ -194,7 +205,7 @@ function EditMemberDialog({ member }: { member: Member }) {
           changes: {
             full_name: form.full_name.trim(),
             designation: form.designation.trim() || null,
-            department: form.department.trim() || null,
+            department: form.department || null,
             phone: form.phone.trim() || null,
           },
         },
@@ -243,7 +254,21 @@ function EditMemberDialog({ member }: { member: Member }) {
           </div>
           <div className="space-y-2">
             <Label>Department</Label>
-            <Input value={form.department} onChange={(e) => update("department", e.target.value)} />
+            <Select
+              value={form.department}
+              onValueChange={(v) => setForm((s) => ({ ...s, department: v as Department }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                {DEPARTMENTS.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>Phone</Label>

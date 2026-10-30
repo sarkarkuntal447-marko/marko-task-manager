@@ -39,14 +39,23 @@ const AVAILABILITY_LABEL: Record<Availability, string> = {
   busy: "Busy",
   on_leave: "On Leave",
   focus: "Focus",
+  wfh: "Work From Home",
+};
+
+// Icon file names in /public/statuses, where they differ from the value itself.
+const AVAILABILITY_ICON: Partial<Record<Availability, string>> = {
+  on_leave: "on-leave",
+  wfh: "work-from-home",
 };
 
 export const availabilityLabel = (a?: string | null): string =>
   a ? (AVAILABILITY_LABEL[a as Availability] ?? a) : "";
 
 /** Status icon shipped in /public/statuses (e.g. on_leave → status-on-leave.svg). */
-export const availabilityIcon = (a?: string | null): string =>
-  `/statuses/status-${(a && a in AVAILABILITY_LABEL ? a : "available").replace("_", "-")}.svg`;
+export const availabilityIcon = (a?: string | null): string => {
+  const value = (a && a in AVAILABILITY_LABEL ? a : "available") as Availability;
+  return `/statuses/status-${AVAILABILITY_ICON[value] ?? value}.svg`;
+};
 
 export const maintenableColor = (m: boolean): string =>
   m ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive";

@@ -57,6 +57,7 @@ function MembersPage() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
   const isSuper = me?.role === "Super_Admin";
+  const isAdmin = isSuper || me?.role === "Admin";
   const [q, setQ] = useState("");
   const [dept, setDept] = useState<DepartmentFilterValue>("all");
   const [addOpen, setAddOpen] = useState(false);
@@ -90,11 +91,12 @@ function MembersPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Mirrors the server rules: everyone can view, only a super admin can change, and nobody
-  // changes their own account here.
+  // Mirrors the server rules: everyone can view, admins and super admins can change, only a
+  // super admin can change a super admin, and nobody changes their own account here.
   const lockReason = (m: Member): string | null => {
-    if (!isSuper) return "Only a super admin can make changes";
+    if (!isAdmin) return "Only an admin can make changes";
     if (m.id === me?.user.id) return "This is you";
+    if (m.role === "Super_Admin" && !isSuper) return "Only a super admin can change a super admin";
     return null;
   };
 
@@ -116,12 +118,12 @@ function MembersPage() {
         <div className="min-w-0">
           <h1 className="text-3xl font-bold">Team</h1>
           <p className="text-muted-foreground">
-            {isSuper
+            {isAdmin
               ? "Manage roles and account access for every member."
-              : "Roles and account status of every member. Only a super admin can make changes."}
+              : "Roles and account status of every member. Only an admin can make changes."}
           </p>
         </div>
-        {isSuper && (
+        {isAdmin && (
           <Button className="w-full sm:w-auto" onClick={() => setAddOpen(true)}>
             <UserPlus className="h-4 w-4 mr-2" /> Add Member
           </Button>
@@ -201,7 +203,7 @@ function MembersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => (
-                      <SelectItem key={r} value={r}>
+                      <SelectItem key={r} value={r} disabled={r === "Super_Admin" && !isSuper}>
                         {roleLabel[r]}
                       </SelectItem>
                     ))}
@@ -220,7 +222,14 @@ function MembersPage() {
         </div>
       </Card>
 
-      {isSuper && <AddMemberDialog open={addOpen} onOpenChange={setAddOpen} onCreated={refresh} />}
+      {isAdmin && (
+        <AddMemberDialog
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onCreated={refresh}
+          canAssignSuper={isSuper}
+        />
+      )}
     </div>
   );
 }
@@ -279,10 +288,12 @@ function AddMemberDialog({
   open,
   onOpenChange,
   onCreated,
+  canAssignSuper,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onCreated: () => void;
+  canAssignSuper: boolean;
 }) {
   const [form, setForm] = useState(emptyForm);
 
@@ -365,7 +376,7 @@ function AddMemberDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>
+                    <SelectItem key={r} value={r} disabled={r === "Super_Admin" && !canAssignSuper}>
                       {roleLabel[r]}
                     </SelectItem>
                   ))}
