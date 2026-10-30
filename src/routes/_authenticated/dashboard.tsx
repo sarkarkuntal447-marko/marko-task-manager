@@ -29,6 +29,7 @@ import {
   Legend,
 } from "recharts";
 import { statusLabel, statusColor, fmtDate } from "@/lib/format";
+import { isActive, isDelivered } from "@/lib/project-status";
 import { MetricCardSkeleton, ChartCardSkeleton, ListRowsSkeleton } from "@/components/skeletons";
 
 type DashboardProject = {
@@ -66,14 +67,10 @@ function DashboardPage() {
   const profiles = data?.profiles ?? [];
 
   const total = projects.length;
-  const active = projects.filter(
-    (p) => !["completed", "on_hold", "cancelled"].includes(p.status),
-  ).length;
-  const completed = projects.filter((p) => p.status === "completed").length;
+  const active = projects.filter((p) => isActive(p.status)).length;
+  const completed = projects.filter((p) => isDelivered(p.status)).length;
   const onHold = projects.filter((p) => p.status === "on_hold").length;
-  const delayed = projects.filter(
-    (p) => p.progress < 100 && !["completed", "cancelled"].includes(p.status),
-  ).length;
+  const delayed = projects.filter((p) => p.progress < 100 && isActive(p.status)).length;
 
   const pendingTasks = tasks.filter((t) => t.status !== "completed").length;
   const completedTasks = tasks.filter((t) => t.status === "completed").length;
@@ -142,7 +139,7 @@ function DashboardPage() {
               value={completed}
               tone="success"
               to="/projects"
-              search={{ status: "completed" }}
+              search={{ status: "delivered" }}
             />
             <Metric
               icon={PauseCircle}

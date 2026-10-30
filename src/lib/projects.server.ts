@@ -2,10 +2,28 @@ import "@tanstack/react-start/server-only";
 import { randomUUID } from "node:crypto";
 import { ObjectId, type Db, type WithId } from "mongodb";
 import type { z } from "zod";
-import type { SubPhaseDoc, PhaseDoc, ProjectDoc, ProjectMemberDoc, TaskDoc } from "./types";
+import type {
+  SubPhaseDoc,
+  PhaseDoc,
+  ProfileDoc,
+  ProjectDoc,
+  ProjectMemberDoc,
+  TaskDoc,
+} from "./types";
+import { ONGOING_TASK_STATUSES } from "./types";
+import {
+  PROJECT_STATUS_LABEL,
+  PROJECT_TYPE_LABEL,
+  canWorkOn,
+  defaultPhasesFor,
+  projectTypeOf,
+  statusesFor,
+  visibleProjectTypes,
+  type ProjectStatus,
+  type ProjectType,
+} from "./project-status";
 import {
   ADMINS,
-  STAFF,
   hasAnyRole,
   logActivity,
   now,
@@ -13,12 +31,12 @@ import {
   checkUsers as checkUserIds,
   type Context,
 } from "./access.server";
-import type { projectSchema, phaseSchema, taskSchema } from "./projects.functions";
+import type { projectFields, projectSchema, phaseSchema } from "./projects.functions";
 import { getDb } from "./mongodb.server";
 
 type ProjectInput = z.infer<typeof projectSchema>;
+type ProjectChanges = Partial<z.infer<typeof projectFields>>;
 type PhaseInput = z.infer<typeof phaseSchema>;
-type TaskInput = z.infer<typeof taskSchema>;
 export type Project = ProjectDoc;
 type Phase = PhaseDoc;
 type Task = TaskDoc;
@@ -29,7 +47,25 @@ function plain<T extends { id: string }>(doc: WithId<T>): T {
   return { ...fields, id: doc.id || String(_id) } as unknown as T;
 }
 
-async function projectDoc(db: Db, id: string) {
+/** Project types this user may see, from their department ("Tech & SEO" sees both). */
+export async function projectTypesFor(context: Context, db: Db): Promise<ProjectType[]> {
+  const profile = await db
+    .collection<ProfileDoc>("profiles")
+    .findOne({ id: context.userId }, { projection: { _id: 0, department: 1 } });
+  return visibleProjectTypes(
+    profile?.department,
+    await hasAnyRole(context.userId, ["Super_Admin"]),
+  );
+}
+
+/** Mongo filter for projects of these types; projects saved before types existed are Tech. */
+export const projectTypeFilter = (types: ProjectType[]) =>
+  types.includes("tech")
+    ? { $or: [{ project_type: { $in: types } }, { project_type: { $exists: false } }] }
+    : { project_type: { $in: types } };
+
+/** Finds a project the user may see. Other departments' projects are reported as not found. */
+async function projectDoc(context: Context, db: Db, id: string) {
   // Documents keep their original UUID `id`; ObjectId-only documents from earlier versions are still found.
   const projects = db.collection<Project>("projects");
   let doc = await projects.findOne({ id, archived_at: null });
@@ -40,7 +76,8 @@ async function projectDoc(db: Db, id: string) {
       id: { $exists: false },
     });
   }
-  if (!doc) throw new Error("Project not found.");
+  if (!doc || !(await projectTypesFor(context, db)).includes(projectTypeOf(doc)))
+    throw new Error("Project not found.");
   return doc;
 }
 
@@ -53,6 +90,58 @@ async function requireAdminOrMember(context: Context, db: Db, projectId: string)
   if (!member) throw new Error("You do not have permission to make this change.");
 }
 
+function checkStatus(type: ProjectType, status?: ProjectStatus) {
+  if (status && !statusesFor(type).includes(status))
+    throw new Error(
+      `"${PROJECT_STATUS_LABEL[status]}" is not a ${PROJECT_TYPE_LABEL[type]} project status.`,
+    );
+}
+
+/** Tech projects take Tech people, SEO projects take SEO people ("Tech & SEO" fits both). */
+async function checkDepartments(db: Db, type: ProjectType, ids: Array<string | null | undefined>) {
+  const selected = ids.filter((id): id is string => !!id);
+  if (!selected.length) return;
+  const profiles = await db
+    .collection<ProfileDoc>("profiles")
+    .find({ id: { $in: selected } }, { projection: { _id: 0, full_name: 1, department: 1 } })
+    .toArray();
+  const wrong = profiles.find((p) => !canWorkOn(type, p.department));
+  if (wrong)
+    throw new Error(
+      `${wrong.full_name ?? "This member"} is not in the ${PROJECT_TYPE_LABEL[type]} department.`,
+    );
+}
+
+// Deterministic _ids make repeated or concurrent seeding idempotent.
+async function insertDefaultPhases(db: Db, projectId: string, type: ProjectType) {
+  const timestamp = now();
+  await db.collection<Phase & { _id: string }>("project_phases").bulkWrite(
+    defaultPhasesFor(type).map((name, position) => ({
+      updateOne: {
+        filter: { _id: `default:${projectId}:${position}` },
+        update: {
+          $setOnInsert: {
+            id: randomUUID(),
+            project_id: projectId,
+            name,
+            position,
+            completed: false,
+            status: "not_started" as const,
+            assigned_to: null,
+            start_date: null,
+            end_date: null,
+            notes: null,
+            created_at: timestamp,
+            updated_at: timestamp,
+          },
+        },
+        upsert: true,
+      },
+    })),
+    { ordered: false },
+  );
+}
+
 async function progress(db: Db, project: Project): Promise<Project> {
   const phases = await db
     .collection<Phase>("project_phases")
@@ -61,33 +150,38 @@ async function progress(db: Db, project: Project): Promise<Project> {
     .toArray();
   return {
     ...project,
-    // Projects created before this field existed have no value stored.
-    isMaintenable: project.isMaintenable ?? false,
+    project_type: projectTypeOf(project),
     progress: phases.length
       ? Math.round((phases.filter((p) => p.completed).length / phases.length) * 100)
       : project.progress,
   };
 }
 
-export async function listProjects(): Promise<Project[]> {
+export async function listProjects(context: Context): Promise<Project[]> {
   const db = await getDb();
   const docs = await db
     .collection<Project>("projects")
-    .find({ archived_at: null })
+    .find({ archived_at: null, ...projectTypeFilter(await projectTypesFor(context, db)) })
     .sort({ created_at: -1 })
     .toArray();
   return Promise.all(docs.map((doc) => progress(db, plain(doc))));
 }
 
-export async function getProject(id: string): Promise<Project> {
+export async function getProject(context: Context, id: string): Promise<Project> {
   const db = await getDb();
-  return progress(db, plain(await projectDoc(db, id)));
+  return progress(db, plain(await projectDoc(context, db, id)));
 }
 
 // Any signed-in user may create a project.
 export async function createProject(context: Context, input: ProjectInput) {
-  await checkUserIds([input.lead_id, input.maintainer_id]);
+  await checkUserIds([input.lead_id]);
+  checkStatus(input.project_type, input.status);
   const db = await getDb();
+  if (!(await projectTypesFor(context, db)).includes(input.project_type))
+    throw new Error(
+      `You can only create projects for your own department, not ${PROJECT_TYPE_LABEL[input.project_type]}.`,
+    );
+  await checkDepartments(db, input.project_type, [input.lead_id]);
   const timestamp = now();
   const project: Project = {
     id: randomUUID(),
@@ -102,9 +196,7 @@ export async function createProject(context: Context, input: ProjectInput) {
     notes: null,
     technology_stack: null,
     lead_id: null,
-    maintainer_id: null,
-    isMaintenable: false,
-    status: "planning",
+    status: statusesFor(input.project_type)[0],
     priority: "medium",
     ...input,
     progress: 0,
@@ -114,6 +206,7 @@ export async function createProject(context: Context, input: ProjectInput) {
     archived_at: null,
   };
   await db.collection<Project>("projects").insertOne({ ...project });
+  await insertDefaultPhases(db, project.id, project.project_type);
   // Non-admin creators join as a member so they can keep editing the project they made.
   if (!(await hasAnyRole(context.userId, ADMINS))) {
     await db.collection<Member>("project_members").insertOne({
@@ -127,60 +220,23 @@ export async function createProject(context: Context, input: ProjectInput) {
   return { id: project.id };
 }
 
-export async function updateProject(context: Context, id: string, changes: Partial<ProjectInput>) {
-  await checkUserIds([changes.lead_id, changes.maintainer_id]);
+export async function updateProject(context: Context, id: string, changes: ProjectChanges) {
+  await checkUserIds([changes.lead_id]);
   const db = await getDb();
-  const doc = await projectDoc(db, id);
+  const doc = await projectDoc(context, db, id);
   await requireAdminOrMember(context, db, id);
+  const type = projectTypeOf(doc);
+  checkStatus(type, changes.status);
+  await checkDepartments(db, type, [changes.lead_id]);
   await db
     .collection<Project>("projects")
     .updateOne({ _id: doc._id, archived_at: null }, { $set: { ...changes, updated_at: now() } });
   return { id };
 }
 
-export async function archiveProject(context: Context, id: string) {
+export async function listProjectPhases(context: Context, projectId: string): Promise<Phase[]> {
   const db = await getDb();
-  const doc = await projectDoc(db, id);
-  await requireAdminOrMember(context, db, id);
-  const timestamp = now();
-  await db
-    .collection<Project>("projects")
-    .updateOne({ _id: doc._id }, { $set: { archived_at: timestamp, updated_at: timestamp } });
-  return { id };
-}
-
-export async function listArchivedProjects(context: Context): Promise<Project[]> {
-  await requireRole(context);
-  const db = await getDb();
-  const docs = await db
-    .collection<Project>("projects")
-    .find({ archived_at: { $ne: null } })
-    .sort({ archived_at: -1 })
-    .toArray();
-  return docs.map(plain);
-}
-
-export async function restoreProject(context: Context, id: string) {
-  await requireRole(context);
-  const db = await getDb();
-  const projects = db.collection<Project>("projects");
-  let doc = await projects.findOne({ id, archived_at: { $ne: null } });
-  if (!doc && /^[a-f\d]{24}$/i.test(id)) {
-    doc = await projects.findOne({
-      _id: new ObjectId(id),
-      archived_at: { $ne: null },
-      id: { $exists: false },
-    });
-  }
-  if (!doc) throw new Error("Archived project not found.");
-  await projects.updateOne({ _id: doc._id }, { $set: { archived_at: null, updated_at: now() } });
-  await logActivity(context.userId, "project.restored", "project", plain(doc).id, doc.name);
-  return { id };
-}
-
-export async function listProjectPhases(projectId: string): Promise<Phase[]> {
-  const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   return (
     await db
       .collection<Phase>("project_phases")
@@ -193,7 +249,7 @@ export async function listProjectPhases(projectId: string): Promise<Phase[]> {
 export async function createProjectPhase(context: Context, projectId: string, input: PhaseInput) {
   await checkUserIds([input.assigned_to]);
   const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   await requireAdminOrMember(context, db, projectId);
   const last = await db
     .collection<Phase>("project_phases")
@@ -226,7 +282,7 @@ export async function updateProjectPhase(
   await requireRole(context);
   await checkUserIds([changes.assigned_to]);
   const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   const phases = db.collection<Phase>("project_phases");
   const before = await phases.findOne({ id: phaseId, project_id: projectId });
   if (!before) throw new Error("Phase not found.");
@@ -256,7 +312,7 @@ export async function updateProjectPhase(
 export async function deleteProjectPhase(context: Context, projectId: string, phaseId: string) {
   await requireRole(context);
   const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   const result = await db
     .collection<Phase>("project_phases")
     .deleteOne({ id: phaseId, project_id: projectId });
@@ -267,107 +323,28 @@ export async function deleteProjectPhase(context: Context, projectId: string, ph
 export async function seedProjectPhases(context: Context, projectId: string) {
   await requireRole(context);
   const db = await getDb();
-  await projectDoc(db, projectId);
-  const phases = db.collection<Phase>("project_phases");
-  const names = [
-    "Requirement Gathering",
-    "UI/UX Design",
-    "Frontend Development",
-    "Backend Development",
-    "API Integration",
-    "CRM Integration",
-    "Database Setup",
-    "Testing & QA",
-    "Deployment",
-    "Client Review",
-    "Maintenance",
-  ];
-  const timestamp = now();
-  // Deterministic _ids make repeated or concurrent seeding idempotent.
-  await db.collection<Phase & { _id: string }>("project_phases").bulkWrite(
-    names.map((name, position) => ({
-      updateOne: {
-        filter: { _id: `default:${projectId}:${position}` },
-        update: {
-          $setOnInsert: {
-            id: randomUUID(),
-            project_id: projectId,
-            name,
-            position,
-            completed: false,
-            status: "not_started" as const,
-            assigned_to: null,
-            start_date: null,
-            end_date: null,
-            notes: null,
-            created_at: timestamp,
-            updated_at: timestamp,
-          },
-        },
-        upsert: true,
-      },
-    })),
-    { ordered: false },
-  );
-  return { count: await phases.countDocuments({ project_id: projectId }) };
+  const doc = await projectDoc(context, db, projectId);
+  await insertDefaultPhases(db, projectId, projectTypeOf(doc));
+  return {
+    count: await db.collection<Phase>("project_phases").countDocuments({ project_id: projectId }),
+  };
 }
 
-export async function listProjectTasks(projectId: string): Promise<Task[]> {
+export async function listOngoingTasks(context: Context, projectId: string): Promise<Task[]> {
   const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   return (
     await db
       .collection<Task>("tasks")
-      .find({ project_id: projectId })
-      .sort({ created_at: -1 })
+      .find({ project_id: projectId, status: { $in: [...ONGOING_TASK_STATUSES] } })
+      .sort({ task_date: -1, created_at: -1 })
       .toArray()
   ).map(plain);
 }
 
-export async function createProjectTask(context: Context, projectId: string, input: TaskInput) {
-  await requireRole(context, STAFF);
-  await checkUserIds([input.assigned_to]);
+export async function listProjectMembers(context: Context, projectId: string): Promise<Member[]> {
   const db = await getDb();
-  await projectDoc(db, projectId);
-  if (
-    !input.phase_id &&
-    (await db.collection<Phase>("project_phases").countDocuments({ project_id: projectId })) > 0
-  ) {
-    throw new Error("Please select a phase for this project.");
-  }
-  if (
-    input.phase_id &&
-    !(await db
-      .collection<Phase>("project_phases")
-      .findOne({ id: input.phase_id, project_id: projectId }))
-  ) {
-    throw new Error("Phase not found in this project.");
-  }
-  const timestamp = now();
-  const task: Task = {
-    id: randomUUID(),
-    project_id: projectId,
-    description: null,
-    assigned_to: null,
-    phase_id: null,
-    due_date: null,
-    priority: "medium",
-    status: "pending",
-    estimated_hours: null,
-    actual_hours: null,
-    notes: null,
-    ...input,
-    created_by: context.userId,
-    created_at: timestamp,
-    updated_at: timestamp,
-  };
-  await db.collection<Task>("tasks").insertOne(task);
-  return { id: task.id };
-}
-
-export async function listProjectMembers(projectId: string): Promise<Member[]> {
-  const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   return (
     await db.collection<Member>("project_members").find({ project_id: projectId }).toArray()
   ).map(plain);
@@ -377,7 +354,8 @@ export async function addProjectMember(context: Context, projectId: string, user
   await requireRole(context);
   await checkUserIds([userId]);
   const db = await getDb();
-  await projectDoc(db, projectId);
+  const doc = await projectDoc(context, db, projectId);
+  await checkDepartments(db, projectTypeOf(doc), [userId]);
   if (
     await db
       .collection<Member>("project_members")
@@ -397,7 +375,7 @@ export async function addProjectMember(context: Context, projectId: string, user
 export async function removeProjectMember(context: Context, projectId: string, userId: string) {
   await requireRole(context);
   const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   await db
     .collection<Member>("project_members")
     .deleteMany({ project_id: projectId, user_id: userId });
@@ -439,7 +417,7 @@ export async function addSubPhases(
 ) {
   await requireRole(context);
   const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   checkDateRange(dates.start_date, dates.end_date);
   const timestamp = now();
   const items: SubPhaseDoc[] = names.map((name) => ({
@@ -475,7 +453,7 @@ export async function updateSubPhase(
 ) {
   await requireRole(context);
   const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   if (changes.start_date !== undefined || changes.end_date !== undefined) {
     const phase = await db
       .collection<Phase>("project_phases")
@@ -508,7 +486,7 @@ export async function deleteSubPhase(
 ) {
   await requireRole(context);
   const db = await getDb();
-  await projectDoc(db, projectId);
+  await projectDoc(context, db, projectId);
   const result = await db
     .collection<Phase>("project_phases")
     .updateOne(

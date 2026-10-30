@@ -25,7 +25,7 @@ try {
     idx("project_phases", { project_id: 1, position: 1 }),
     idx("project_members", { project_id: 1, user_id: 1 }),
     idx("tasks", { id: 1 }, { unique: true }),
-    idx("tasks", { assigned_to: 1 }),
+    idx("tasks", { assigned_to: 1, task_date: -1 }),
     idx("tasks", { project_id: 1 }),
     idx("daily_logs", { user_id: 1, log_date: -1 }),
     idx("activity_log", { created_at: -1 }),

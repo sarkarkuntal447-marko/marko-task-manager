@@ -1,23 +1,30 @@
 import type { Availability, Department } from "./types";
+import { PROJECT_STATUS_LABEL, type ProjectStatus } from "./project-status";
 
 export const statusLabel = (s: string) =>
+  PROJECT_STATUS_LABEL[s as ProjectStatus] ??
   s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 export const statusColor = (s: string): string => {
   const map: Record<string, string> = {
-    planning: "bg-muted text-muted-foreground",
-    requirement_gathering: "bg-info/10 text-info",
-    design: "bg-chart-5/15 text-chart-5",
-    development: "bg-primary/10 text-primary",
-    api_integration: "bg-primary/10 text-primary",
-    crm_integration: "bg-primary/10 text-primary",
-    testing: "bg-warning/15 text-warning-foreground",
-    deployment: "bg-info/15 text-info",
-    client_review: "bg-warning/15 text-warning-foreground",
-    maintenance: "bg-muted text-muted-foreground",
-    completed: "bg-success/15 text-success",
+    // Tech project stages
+    requirement_analysis: "bg-info/10 text-info",
+    ui_ux_design: "bg-chart-5/15 text-chart-5",
+    dev_flow_architecture: "bg-primary/10 text-primary",
+    dev_implementation: "bg-primary/10 text-primary",
+    testing_deployment: "bg-warning/15 text-warning-foreground",
+    complete_delivered: "bg-success/15 text-success",
+    complete_maintenance: "bg-success/15 text-success",
+    maintenance_new_feature: "bg-info/15 text-info",
+    // SEO project stages
+    requirement_handover: "bg-info/10 text-info",
+    workflow_roadmap: "bg-chart-5/15 text-chart-5",
+    scope_of_work: "bg-primary/10 text-primary",
+    migration_testing: "bg-warning/15 text-warning-foreground",
+    maintenance_optimisation: "bg-success/15 text-success",
     on_hold: "bg-muted text-muted-foreground",
-    cancelled: "bg-destructive/10 text-destructive",
+    // phases and tasks
+    completed: "bg-success/15 text-success",
     pending: "bg-muted text-muted-foreground",
     in_progress: "bg-info/15 text-info",
     blocked: "bg-destructive/10 text-destructive",
@@ -57,8 +64,11 @@ export const availabilityIcon = (a?: string | null): string => {
   return `/statuses/status-${AVAILABILITY_ICON[value] ?? value}.svg`;
 };
 
-export const maintenableColor = (m: boolean): string =>
-  m ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive";
+/** Today's date on this device as YYYY-MM-DD (local time, not UTC). */
+export const todayStr = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+};
 
 export const fmtDate = (d?: string | null) =>
   d

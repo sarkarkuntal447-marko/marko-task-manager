@@ -8,7 +8,7 @@ The app now stores everything in MongoDB (Supabase has been removed).
 2. `npm install`
 3. `npm run db:test` — checks the connection.
 4. `npm run db:setup` — creates indexes.
-5. `npm run db:create-admin -- you@example.com "Password" "Your Name"` — creates the first super admin.
+5. `npm run db:create-admin` — creates the five test accounts (one per role and department, listed at the top of `scripts/create-admin.mjs`). For your own super admin instead, run `npm run db:create-admin -- you@example.com "Password" "Your Name"`.
 6. `npm run dev`
 
 ## Deploy to Vercel

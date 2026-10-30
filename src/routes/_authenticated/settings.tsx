@@ -48,7 +48,6 @@ function ProfileForm() {
   const [form, setForm] = useState({
     full_name: "",
     designation: "",
-    department: "",
     phone: "",
     joining_date: "",
     availability: "available" as Availability,
@@ -59,7 +58,6 @@ function ProfileForm() {
       setForm({
         full_name: me.profile.full_name ?? "",
         designation: me.profile.designation ?? "",
-        department: me.profile.department ?? "",
         phone: me.profile.phone ?? "",
         joining_date: me.profile.joining_date ?? "",
         availability: me.profile.availability ?? "available",
@@ -74,7 +72,6 @@ function ProfileForm() {
         data: {
           full_name: form.full_name || null,
           designation: form.designation || null,
-          department: form.department || null,
           phone: form.phone || null,
           joining_date: form.joining_date || null,
           availability: form.availability,
@@ -112,9 +109,12 @@ function ProfileForm() {
         </div>
         <div className="space-y-2">
           <Label>Department</Label>
+          {/* Department decides which projects and tasks you see, so only a super admin sets it. */}
           <Input
-            value={form.department}
-            onChange={(e) => setForm({ ...form, department: e.target.value })}
+            value={me?.profile?.department ?? "Not set"}
+            readOnly
+            disabled
+            title="Only a super admin can change your department"
           />
         </div>
         <div className="space-y-2">

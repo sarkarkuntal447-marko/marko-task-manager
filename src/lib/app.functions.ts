@@ -1,13 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAuth } from "./auth-middleware";
-import { AVAILABILITY, DEPARTMENTS } from "./types";
+import { AVAILABILITY, DEPARTMENTS, PRIORITIES, TASK_STATUSES } from "./types";
 
 const id = z.string().trim().min(1).max(100);
 const text = z.string().trim().max(10000);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const priority = z.enum(["low", "medium", "high", "critical"]);
-const taskStatus = z.enum(["pending", "in_progress", "blocked", "testing", "completed"]);
+const priority = z.enum(PRIORITIES);
+const taskStatus = z.enum(TASK_STATUSES);
 const role = z.enum(["Developer", "SEO", "Admin", "Super_Admin"]);
 const srv = () => import("./app.server");
 
@@ -56,7 +56,7 @@ export const updateMyProfile = createServerFn({ method: "POST" })
       .object({
         full_name: text.max(200).nullable(),
         designation: text.max(200).nullable(),
-        department: text.max(200).nullable(),
+        // No department: it decides what you can see, so only a super admin changes it.
         phone: text.max(50).nullable(),
         joining_date: date.nullable(),
         availability: z.enum(AVAILABILITY),
@@ -124,27 +124,37 @@ export const getDashboard = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => (await srv()).getDashboard(context));
 
-// ---- tasks ----
-export const listAllTasks = createServerFn({ method: "GET" })
+// ---- tasks (each person's daily work log) ----
+const taskFields = z
+  .object({
+    task_date: date,
+    project_id: id,
+    name: text.min(1),
+    priority,
+    status: taskStatus,
+    start_date: date.nullable(),
+    end_date: date.nullable(),
+    notes: text.nullable(),
+  })
+  .strict();
+
+export const listMyTasks = createServerFn({ method: "GET" })
   .middleware([requireAuth])
-  .handler(async () => (await srv()).listAllTasks());
+  .handler(async ({ context }) => (await srv()).listMyTasks(context));
+
+// Admins and super admins: tasks of the people in their department.
+export const listTeamTasks = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => (await srv()).listTeamTasks(context));
+
+// Projects the current user may log tasks against.
+export const listTaskProjects = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => (await srv()).listTaskProjects(context));
 
 export const createTask = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .validator((d: unknown) =>
-    z
-      .object({
-        name: z.string().trim().min(1).max(200),
-        description: text.nullable().optional(),
-        project_id: id.nullable().optional(),
-        phase_id: id.nullable().optional(),
-        priority: priority.optional(),
-        status: taskStatus.optional(),
-        due_date: date.nullable().optional(),
-      })
-      .strict()
-      .parse(d),
-  )
+  .validator((d: unknown) => taskFields.parse(d))
   .handler(async ({ data, context }) => (await srv()).createTask(context, data));
 
 export const updateTask = createServerFn({ method: "POST" })
@@ -153,16 +163,8 @@ export const updateTask = createServerFn({ method: "POST" })
     z
       .object({
         id,
-        changes: z
-          .object({
-            name: z.string().trim().min(1).max(200),
-            description: text.nullable(),
-            priority,
-            status: taskStatus,
-            due_date: date.nullable(),
-          })
+        changes: taskFields
           .partial()
-          .strict()
           .refine((v) => Object.keys(v).length > 0, "No changes supplied"),
       })
       .strict()

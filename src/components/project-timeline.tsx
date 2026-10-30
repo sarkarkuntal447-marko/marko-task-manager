@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Diamond, Check, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, Sparkles } from "lucide-react";
 import { updateProject, updateProjectPhase } from "@/lib/projects.functions";
 import { getTeamDirectory } from "@/lib/app.functions";
-import type { PhaseDoc, ProjectDoc, TaskDoc } from "@/lib/types";
+import type { PhaseDoc, ProjectDoc } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { statusLabel, fmtDate } from "@/lib/format";
+import { PROJECT_TYPE_LABEL, isDelivered, projectTypeOf } from "@/lib/project-status";
 
 // ---------- date helpers (days since epoch, UTC, so time zones never shift a date) ----------
 const toDay = (s: string) => {
@@ -41,7 +42,7 @@ const ROW = 38; // row height
 
 type Row = {
   key: string;
-  kind: "project" | "phase" | "sub" | "task";
+  kind: "project" | "phase" | "sub";
   depth: number;
   label: string;
   sublabel?: string;
@@ -59,12 +60,7 @@ function colors(r: Row) {
   if (r.done) return { track: "bg-success/30", fill: "bg-success" };
   if (r.overdue || r.status === "blocked")
     return { track: "bg-destructive/30", fill: "bg-destructive" };
-  if (
-    r.status === "not_started" ||
-    r.status === "on_hold" ||
-    r.status === "cancelled" ||
-    r.status === "planning"
-  )
+  if (r.status === "not_started" || r.status === "on_hold")
     return { track: "bg-muted-foreground/20", fill: "bg-muted-foreground/50" };
   return { track: "bg-primary/30", fill: "bg-primary" };
 }
@@ -72,7 +68,6 @@ function colors(r: Row) {
 export function ProjectTimeline({
   project,
   phases,
-  tasks,
   members,
   canEdit,
   onOpenPhase,
@@ -80,7 +75,6 @@ export function ProjectTimeline({
 }: {
   project: ProjectDoc;
   phases: PhaseDoc[];
-  tasks: TaskDoc[];
   members: Awaited<ReturnType<typeof getTeamDirectory>>;
   canEdit: boolean;
   onOpenPhase: (phaseId: string) => void;
@@ -101,7 +95,7 @@ export function ProjectTimeline({
   const px = PX[zoom];
   const today = todayDay();
 
-  // ---------- build rows: project > phases > (tasks + sub-phases) ----------
+  // ---------- build rows: project > phases > sub-phases ----------
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     const owner = (id?: string | null) => members.find((m) => m.id === id)?.full_name;
@@ -111,29 +105,24 @@ export function ProjectTimeline({
       : project.actual_delivery_date
         ? toDay(project.actual_delivery_date)
         : null;
-    const pDone = project.status === "completed";
+    const pDone = isDelivered(project.status);
     out.push({
       key: "project",
       kind: "project",
       depth: 0,
       label: project.name,
-      sublabel: statusLabel(project.status),
+      sublabel: `${PROJECT_TYPE_LABEL[projectTypeOf(project)]} · ${statusLabel(project.status)}`,
       start: pStart ?? pEnd,
       end: pEnd ?? pStart,
       progress: project.progress ?? 0,
       status: project.status,
       done: pDone,
-      overdue:
-        !pDone &&
-        pEnd != null &&
-        pEnd < today &&
-        !["cancelled", "on_hold"].includes(project.status),
+      overdue: !pDone && pEnd != null && pEnd < today && project.status !== "on_hold",
       collapsibleKey: "project",
     });
     if (collapsed.has("project")) return out;
     for (const ph of phases) {
       const subs = ph.sub_phases ?? [];
-      const phTasks = tasks.filter((t) => t.phase_id === ph.id);
       const s = ph.start_date ? toDay(ph.start_date) : null,
         e = ph.end_date ? toDay(ph.end_date) : null;
       const done = !!ph.completed;
@@ -156,7 +145,7 @@ export function ProjectTimeline({
               ? 50
               : 0,
         overdue: !done && e != null && e < today,
-        collapsibleKey: subs.length || phTasks.length ? `phase:${ph.id}` : undefined,
+        collapsibleKey: subs.length ? `phase:${ph.id}` : undefined,
       });
       if (collapsed.has(`phase:${ph.id}`)) continue;
       for (const sp of subs) {
@@ -176,26 +165,9 @@ export function ProjectTimeline({
           phaseId: ph.id,
         });
       }
-      for (const t of phTasks) {
-        const due = t.due_date ? toDay(t.due_date) : null;
-        out.push({
-          key: `task:${t.id}`,
-          kind: "task",
-          depth: 2,
-          label: t.name,
-          sublabel: [statusLabel(t.status), owner(t.assigned_to)].filter(Boolean).join(" · "),
-          start: due,
-          end: due,
-          progress: t.status === "completed" ? 100 : 0,
-          status: t.status,
-          done: t.status === "completed",
-          overdue: t.status !== "completed" && due != null && due < today,
-          phaseId: ph.id,
-        });
-      }
     }
     return out;
-  }, [project, phases, tasks, members, collapsed, today]);
+  }, [project, phases, members, collapsed, today]);
 
   const effective = (r: Row) => {
     if (drag && drag.key === r.key) {
@@ -346,7 +318,7 @@ export function ProjectTimeline({
       return n;
     });
   const allParents = phases
-    .filter((ph) => (ph.sub_phases ?? []).length || tasks.some((t) => t.phase_id === ph.id))
+    .filter((ph) => (ph.sub_phases ?? []).length)
     .map((ph) => `phase:${ph.id}`);
   const canSpread =
     canEdit && phases.length > 0 && project.start_date && project.expected_delivery_date;
@@ -412,7 +384,7 @@ export function ProjectTimeline({
               className="sticky left-0 z-40 bg-card border-r border-border flex items-end px-3 pb-1 text-xs font-medium text-muted-foreground"
               style={{ width: LEFT, height: zoom === "quarters" ? 30 : 52 }}
             >
-              Phase / Task
+              Phase
             </div>
             <div className="relative" style={{ width: W, height: zoom === "quarters" ? 30 : 52 }}>
               {months.map((m) => (
@@ -482,9 +454,6 @@ export function ProjectTimeline({
                       </button>
                     ) : (
                       <span className="w-4 shrink-0" />
-                    )}
-                    {r.kind === "task" && (
-                      <Diamond className="h-3 w-3 shrink-0 text-muted-foreground" />
                     )}
                     {r.kind === "sub" && (
                       <Check
@@ -560,17 +529,6 @@ export function ProjectTimeline({
                     style={{ top: i * ROW, height: ROW }}
                     onClick={(e) => createBar(e, r)}
                   >
-                    {hasDates && r.kind === "task" && (
-                      <div
-                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
-                        style={{ left: x(eff.start!) + px / 2 }}
-                        title={`${r.label} · due ${fmtDate(toStr(eff.start!))} · ${owner}`}
-                      >
-                        <Diamond
-                          className={`h-4 w-4 ${r.done ? "fill-success text-success" : r.overdue ? "fill-destructive text-destructive" : "fill-primary text-primary-foreground/70"}`}
-                        />
-                      </div>
-                    )}
                     {hasDates && (isBar || r.kind === "sub") && (
                       <div
                         className={`absolute top-[7px] rounded-md overflow-hidden group ${c.track} ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${r.kind === "project" ? "h-6 ring-1 ring-foreground/20" : "h-6"}`}
@@ -636,9 +594,6 @@ export function ProjectTimeline({
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-4 rounded-sm bg-muted-foreground/50" /> Not started
-        </span>
-        <span className="flex items-center gap-1.5">
-          <Diamond className="h-3 w-3 fill-primary text-primary-foreground/70" /> Task due date
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-3 w-0.5 bg-destructive" /> Today

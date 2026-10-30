@@ -25,8 +25,15 @@ import {
 } from "@/components/ui/select";
 import { DEPARTMENTS, type Department } from "@/lib/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Briefcase, Calendar, Crown, Pencil, Wrench } from "lucide-react";
-import { statusLabel, statusColor, priorityColor, availabilityLabel, fmtDate } from "@/lib/format";
+import { ArrowLeft, Briefcase, Calendar, Crown, Pencil } from "lucide-react";
+import {
+  statusLabel,
+  statusColor,
+  priorityColor,
+  availabilityLabel,
+  fmtDate,
+  todayStr,
+} from "@/lib/format";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { AvailabilityIcon } from "@/components/availability-status";
 import { MemberDetailSkeleton } from "@/components/skeletons";
@@ -53,16 +60,11 @@ function MemberDetail() {
   if (isLoading) return <MemberDetailSkeleton />;
   if (!member) return <div className="p-8 text-muted-foreground">Member not found.</div>;
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todaysTasks = tasks.filter(
-    (t) => (t.created_at ?? "").slice(0, 10) === today || t.due_date === today,
-  );
+  const today = todayStr();
+  const todaysTasks = tasks.filter((t) => t.task_date === today);
   const previousTasks = tasks.filter((t) => !todaysTasks.includes(t));
 
-  const working = projects.filter(
-    (p) => memberships.includes(p.id) || p.lead_id === id || p.maintainer_id === id,
-  );
-  const maintains = projects.filter((p) => p.maintainer_id === id);
+  const working = projects.filter((p) => memberships.includes(p.id) || p.lead_id === id);
   const ownsAsSto = projects.filter((p) => p.lead_id === id);
 
   const display = member.full_name ?? "Team member";
@@ -122,51 +124,48 @@ function MemberDetail() {
         </div>
       </Card>
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card className="p-4 sm:p-6 border-primary/40 bg-primary/[0.04]">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className="font-semibold">Today's Tasks · {fmtDate(today)}</h2>
-            <Badge variant="secondary">{todaysTasks.length}</Badge>
-          </div>
-          {todaysTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tasks for today.</p>
-          ) : (
-            <div className="space-y-2">
-              {todaysTasks.map((t) => (
-                <TaskLine key={t.id} t={t} />
-              ))}
+      {/* Tasks are private to the member and the admins of their department. */}
+      {detail?.canSeeTasks && (
+        <div className="grid lg:grid-cols-2 gap-4">
+          <Card className="p-4 sm:p-6 border-primary/40 bg-primary/[0.04]">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h2 className="font-semibold">Today's Tasks · {fmtDate(today)}</h2>
+              <Badge variant="secondary">{todaysTasks.length}</Badge>
             </div>
-          )}
-        </Card>
+            {todaysTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No tasks for today.</p>
+            ) : (
+              <div className="space-y-2">
+                {todaysTasks.map((t) => (
+                  <TaskLine key={t.id} t={t} />
+                ))}
+              </div>
+            )}
+          </Card>
 
-        <Card className="p-4 sm:p-6">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className="font-semibold">Previous Tasks</h2>
-            <Badge variant="secondary">{previousTasks.length}</Badge>
-          </div>
-          {previousTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No prior tasks.</p>
-          ) : (
-            <div className="space-y-2 max-h-96 overflow-auto overscroll-contain pr-1">
-              {previousTasks.map((t) => (
-                <TaskLine key={t.id} t={t} />
-              ))}
+          <Card className="p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h2 className="font-semibold">Previous Tasks</h2>
+              <Badge variant="secondary">{previousTasks.length}</Badge>
             </div>
-          )}
-        </Card>
-      </div>
+            {previousTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No prior tasks.</p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-auto overscroll-contain pr-1">
+                {previousTasks.map((t) => (
+                  <TaskLine key={t.id} t={t} />
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
         <ProjectList
           title="Currently working on"
           icon={<Briefcase className="h-4 w-4" />}
           projects={working}
-          stoIds={ownsAsSto.map((p) => p.id)}
-        />
-        <ProjectList
-          title="Maintains"
-          icon={<Wrench className="h-4 w-4" />}
-          projects={maintains}
           stoIds={ownsAsSto.map((p) => p.id)}
         />
         <ProjectList
@@ -293,14 +292,13 @@ function TaskLine({
   return (
     <div className="p-3 rounded-lg border border-border flex flex-wrap items-center gap-2 sm:gap-3">
       <div className="flex-1 min-w-[10rem]">
-        <p className="font-medium text-sm break-words">{t.name}</p>
+        <p className="font-medium text-sm whitespace-pre-wrap break-words">{t.name}</p>
         <p className="text-xs text-muted-foreground">
-          {t.projects?.name ?? "—"}
-          {t.due_date && ` · due ${fmtDate(t.due_date)}`}
+          {fmtDate(t.task_date)} · {t.project_name ?? "—"}
         </p>
       </div>
       <Badge variant="secondary" className={priorityColor(t.priority)}>
-        {t.priority}
+        {statusLabel(t.priority)}
       </Badge>
       <Badge variant="secondary" className={statusColor(t.status)}>
         {statusLabel(t.status)}

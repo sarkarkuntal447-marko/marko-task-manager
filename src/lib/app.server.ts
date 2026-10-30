@@ -1,5 +1,6 @@
 import "@tanstack/react-start/server-only";
 import { randomUUID } from "node:crypto";
+import type { Db, WithId } from "mongodb";
 import { getDb } from "./mongodb.server";
 import { hashPassword, verifyPassword, signSession, setSessionCookie } from "./auth.server";
 import {
@@ -14,12 +15,14 @@ import {
   rolesOf,
   type Context,
 } from "./access.server";
-import { listProjects } from "./projects.server";
+import { listProjects, projectTypeFilter, projectTypesFor } from "./projects.server";
+import { canSeeTasksOf } from "./project-status";
 import type {
   AppRole,
   DailyLogDoc,
   ActivityDoc,
   ProfileDoc,
+  ProjectDoc,
   ProjectMemberDoc,
   TaskDoc,
   UserDoc,
@@ -118,10 +121,7 @@ export async function createUser(
 export async function updateMyProfile(
   context: Context,
   changes: Partial<
-    Pick<
-      ProfileDoc,
-      "full_name" | "designation" | "department" | "phone" | "joining_date" | "availability"
-    >
+    Pick<ProfileDoc, "full_name" | "designation" | "phone" | "joining_date" | "availability">
   >,
 ) {
   const db = await getDb();
@@ -188,9 +188,11 @@ export async function getMember(context: Context, id: string) {
   // Only a super admin edits member profiles here (members edit their own in Settings).
   const canEdit = await hasAnyRole(context.userId, ["Super_Admin"]);
   const canSeePhone = context.userId === id || (await hasAnyRole(context.userId, ADMINS));
+  const canSeeTasks =
+    context.userId === id || (await teamTaskOwners(context, db)).some((m) => m.id === id);
   const [tasks, projects, memberships, private_] = await Promise.all([
-    listAllTasks({ assigned_to: id }),
-    listProjects(),
+    canSeeTasks ? tasksOf(db, [id]) : [],
+    listProjects(context),
     db.collection<ProjectMemberDoc>("project_members").find({ user_id: id }).toArray(),
     // Phone stays private: only the member themselves and admins receive it.
     canSeePhone
@@ -200,6 +202,7 @@ export async function getMember(context: Context, id: string) {
   return {
     member: { ...member, phone: private_?.phone ?? null },
     canEdit,
+    canSeeTasks,
     tasks,
     projects,
     memberships: memberships.map((m) => m.project_id),
@@ -223,7 +226,7 @@ export async function updateMemberProfile(
 export async function getDashboard(context: Context) {
   const db = await getDb();
   const [projects, tasks, profiles] = await Promise.all([
-    listProjects(),
+    listProjects(context),
     db
       .collection<TaskDoc>("tasks")
       .find({}, { projection: { _id: 0, status: 1, priority: 1 } })
@@ -233,86 +236,127 @@ export async function getDashboard(context: Context) {
   return { projects, tasks, profiles };
 }
 
-// ---------- tasks ----------
-export async function listAllTasks(filter: { assigned_to?: string } = {}) {
+// ---------- tasks (each person's daily work log) ----------
+type TaskInput = Pick<
+  TaskDoc,
+  "task_date" | "project_id" | "name" | "priority" | "status" | "start_date" | "end_date" | "notes"
+>;
+
+/** Projects someone may log tasks against: admins any project, others the ones they work on. */
+async function taskProjectIds(context: Context, db: Db): Promise<string[] | "all"> {
+  if (await hasAnyRole(context.userId, ADMINS)) return "all";
+  const [memberships, owned] = await Promise.all([
+    db.collection<ProjectMemberDoc>("project_members").find({ user_id: context.userId }).toArray(),
+    db
+      .collection<ProjectDoc>("projects")
+      .find({ lead_id: context.userId }, { projection: { _id: 0, id: 1 } })
+      .toArray(),
+  ]);
+  return [...new Set([...memberships.map((m) => m.project_id), ...owned.map((p) => p.id)])];
+}
+
+export async function listTaskProjects(context: Context) {
   const db = await getDb();
-  const tasks = await db
-    .collection<TaskDoc>("tasks")
-    .find(filter)
-    .sort({ created_at: -1 })
-    .toArray();
+  const allowed = await taskProjectIds(context, db);
+  return (await db
+    .collection<ProjectDoc>("projects")
+    .find(
+      {
+        archived_at: null,
+        ...projectTypeFilter(await projectTypesFor(context, db)),
+        ...(allowed === "all" ? {} : { id: { $in: allowed } }),
+      },
+      { projection: { _id: 0, id: 1, name: 1 } },
+    )
+    .sort({ name: 1 })
+    .toArray()) as Array<Pick<ProjectDoc, "id" | "name">>;
+}
+
+/** Other people whose tasks this user may see (admins only, by department). */
+async function teamTaskOwners(context: Context, db: Db) {
+  if (!(await hasAnyRole(context.userId, ADMINS))) return [];
+  const people = (await db
+    .collection<ProfileDoc>("profiles")
+    .find({}, { projection: { _id: 0, id: 1, full_name: 1, designation: 1, department: 1 } })
+    .sort({ full_name: 1 })
+    .toArray()) as Array<Pick<ProfileDoc, "id" | "full_name" | "designation" | "department">>;
+  const viewer = people.find((p) => p.id === context.userId);
+  return people.filter(
+    (p) => p.id !== context.userId && canSeeTasksOf(viewer?.department, p.department),
+  );
+}
+
+async function withProjectNames(db: Db, tasks: Array<WithId<TaskDoc>>) {
   const ids = [...new Set(tasks.map((t) => t.project_id).filter((x): x is string => !!x))];
   const names = new Map(
     (
       await db
-        .collection<{ id: string; name: string }>("projects")
-        .find({ id: { $in: ids } }, { projection: { id: 1, name: 1 } })
-        .toArray()
-    ).map((p) => [p.id, p.name]),
-  );
-  const phaseIds = [...new Set(tasks.map((t) => t.phase_id).filter((x): x is string => !!x))];
-  const phaseNames = new Map(
-    (
-      await db
-        .collection<{ id: string; name: string }>("project_phases")
-        .find({ id: { $in: phaseIds } }, { projection: { id: 1, name: 1 } })
+        .collection<ProjectDoc>("projects")
+        .find({ id: { $in: ids } }, { projection: { _id: 0, id: 1, name: 1 } })
         .toArray()
     ).map((p) => [p.id, p.name]),
   );
   return tasks.map((t) => ({
     ...clean(t),
-    projects: t.project_id && names.has(t.project_id) ? { name: names.get(t.project_id)! } : null,
-    phase: t.phase_id && phaseNames.has(t.phase_id) ? { name: phaseNames.get(t.phase_id)! } : null,
+    project_name: (t.project_id && names.get(t.project_id)) || null,
   }));
 }
 
-type NewTask = Pick<TaskDoc, "name"> &
-  Partial<
-    Pick<TaskDoc, "description" | "project_id" | "phase_id" | "priority" | "status" | "due_date">
-  >;
+async function tasksOf(db: Db, ownerIds: string[]) {
+  const tasks = await db
+    .collection<TaskDoc>("tasks")
+    .find({ assigned_to: { $in: ownerIds } })
+    .sort({ task_date: -1, created_at: -1 })
+    .toArray();
+  return withProjectNames(db, tasks);
+}
 
-// A user may add a task to their own list; staff may too.
-export async function createTask(context: Context, input: NewTask) {
+export async function listMyTasks(context: Context) {
+  return tasksOf(await getDb(), [context.userId]);
+}
+
+export async function listTeamTasks(context: Context) {
+  await requireRole(context, ADMINS);
   const db = await getDb();
+  const members = await teamTaskOwners(context, db);
+  return {
+    members,
+    tasks: await tasksOf(
+      db,
+      members.map((m) => m.id),
+    ),
+  };
+}
+
+async function checkTaskProject(context: Context, db: Db, projectId: string) {
+  const allowed = await taskProjectIds(context, db);
+  if (allowed !== "all" && !allowed.includes(projectId))
+    throw new Error("You can only add tasks to projects you are working on.");
   if (
-    input.project_id &&
-    !(await db.collection("projects").findOne({ id: input.project_id, archived_at: null }))
-  ) {
+    !(await db.collection("projects").findOne({
+      id: projectId,
+      archived_at: null,
+      ...projectTypeFilter(await projectTypesFor(context, db)),
+    }))
+  )
     throw new Error("Project not found.");
-  }
-  // If the project already has phases, one must be chosen. A new project with no phases needs none.
-  if (
-    input.project_id &&
-    !input.phase_id &&
-    (await db.collection("project_phases").countDocuments({ project_id: input.project_id })) > 0
-  ) {
-    throw new Error("Please select a phase for this project.");
-  }
-  // A phase belongs to a project, so it can only be chosen together with that project.
-  if (input.phase_id) {
-    if (!input.project_id) throw new Error("Choose a project before choosing a phase.");
-    if (
-      !(await db
-        .collection("project_phases")
-        .findOne({ id: input.phase_id, project_id: input.project_id }))
-    ) {
-      throw new Error("Phase not found in this project.");
-    }
-  }
+}
+
+function checkTaskDates(start?: string | null, end?: string | null) {
+  // Dates are YYYY-MM-DD, so plain string comparison orders them correctly.
+  if (start && end && end < start) throw new Error("End date cannot be before the start date.");
+}
+
+// Everyone logs their own tasks; nobody adds tasks for someone else.
+export async function createTask(context: Context, input: TaskInput & { project_id: string }) {
+  const db = await getDb();
+  await checkTaskProject(context, db, input.project_id);
+  checkTaskDates(input.start_date, input.end_date);
   const timestamp = now();
   const task: TaskDoc = {
     id: randomUUID(),
-    project_id: input.project_id ?? null,
-    phase_id: input.phase_id ?? null,
-    name: input.name,
-    description: input.description ?? null,
+    ...input,
     assigned_to: context.userId,
-    due_date: input.due_date ?? null,
-    priority: input.priority ?? "medium",
-    status: input.status ?? "pending",
-    estimated_hours: null,
-    actual_hours: null,
-    notes: null,
     created_by: context.userId,
     created_at: timestamp,
     updated_at: timestamp,
@@ -325,20 +369,27 @@ export async function createTask(context: Context, input: NewTask) {
   return { id: task.id };
 }
 
-export async function updateTask(
-  context: Context,
-  id: string,
-  changes: Partial<Pick<TaskDoc, "name" | "description" | "priority" | "status" | "due_date">>,
-) {
-  const db = await getDb();
-  const tasks = db.collection<TaskDoc>("tasks");
-  const task = await tasks.findOne({ id });
+/** Only the person a task belongs to may change or delete it. */
+async function ownTask(context: Context, db: Db, id: string) {
+  const task = await db.collection<TaskDoc>("tasks").findOne({ id });
   if (!task) throw new Error("Task not found.");
-  // Only the person who created the task may edit it.
-  if (task.created_by !== context.userId) {
-    throw new Error("Only the person who created this task can edit it.");
-  }
-  await tasks.updateOne({ id }, { $set: { ...changes, updated_at: now() } });
+  if (task.assigned_to !== context.userId)
+    throw new Error("Only the person this task belongs to can change it.");
+  return task;
+}
+
+export async function updateTask(context: Context, id: string, changes: Partial<TaskInput>) {
+  const db = await getDb();
+  const task = await ownTask(context, db, id);
+  if (changes.project_id && changes.project_id !== task.project_id)
+    await checkTaskProject(context, db, changes.project_id);
+  checkTaskDates(
+    changes.start_date !== undefined ? changes.start_date : task.start_date,
+    changes.end_date !== undefined ? changes.end_date : task.end_date,
+  );
+  await db
+    .collection<TaskDoc>("tasks")
+    .updateOne({ id }, { $set: { ...changes, updated_at: now() } });
   if (changes.status && changes.status !== task.status) {
     await logActivity(
       context.userId,
@@ -354,12 +405,7 @@ export async function updateTask(
 
 export async function deleteTask(context: Context, id: string) {
   const db = await getDb();
-  const task = await db.collection<TaskDoc>("tasks").findOne({ id });
-  if (!task) throw new Error("Task not found.");
-  // Only the person who created the task may delete it.
-  if (task.created_by !== context.userId) {
-    throw new Error("Only the person who created this task can delete it.");
-  }
+  await ownTask(context, db, id);
   await db.collection<TaskDoc>("tasks").deleteOne({ id });
   await db
     .collection<DailyLogDoc>("daily_logs")
@@ -425,9 +471,6 @@ export async function deleteUser(context: Context, targetId: string) {
       .collection("project_phases")
       .updateMany({ assigned_to: targetId }, { $set: { assigned_to: null } }),
     db.collection("projects").updateMany({ lead_id: targetId }, { $set: { lead_id: null } }),
-    db
-      .collection("projects")
-      .updateMany({ maintainer_id: targetId }, { $set: { maintainer_id: null } }),
     db.collection("activity_log").updateMany({ actor_id: targetId }, { $set: { actor_id: null } }),
   ]);
   await logActivity(context.userId, "member.removed", "profile", targetId, name);

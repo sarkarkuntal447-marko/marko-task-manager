@@ -15,7 +15,9 @@
     "db:setup": "node --env-file=.env scripts/setup-mongodb.mjs",
     "db:create-admin": "node --env-file=.env scripts/create-admin.mjs",
     "db:reset-password": "node --env-file=.env scripts/reset-password.mjs",
-    "db:migrate-roles": "node --env-file=.env scripts/migrate-roles.mjs"
+    "db:migrate-roles": "node --env-file=.env scripts/migrate-roles.mjs",
+    "db:migrate-project-types": "node --env-file=.env scripts/migrate-project-types.mjs",
+    "db:migrate-tasks": "node --env-file=.env scripts/migrate-tasks.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
