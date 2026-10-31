@@ -1,16 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Calendar } from "lucide-react";
-import { toast } from "sonner";
-import { getProject, listProjectPhases, updateProjectPhase } from "@/lib/projects.functions";
-import { getTeamDirectory } from "@/lib/app.functions";
-import { SubPhases } from "@/components/sub-phases";
+import { getProject, listProjectPhases } from "@/lib/projects.functions";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import { statusLabel, statusColor, fmtDate } from "@/lib/format";
-import { useCurrentUser, canManageProjects } from "@/hooks/use-current-user";
 import { PhaseDetailSkeleton } from "@/components/skeletons";
 
 export const Route = createFileRoute("/_authenticated/projects/$id_/phases/$phaseId")({
@@ -18,11 +12,9 @@ export const Route = createFileRoute("/_authenticated/projects/$id_/phases/$phas
   component: PhasePage,
 });
 
+/** Read-only details of one phase; phases are edited from the project's Phases tab. */
 function PhasePage() {
   const { id, phaseId } = Route.useParams();
-  const qc = useQueryClient();
-  const { data: me } = useCurrentUser();
-  const canManage = canManageProjects(me?.role);
 
   const { data: project } = useQuery({
     queryKey: ["project", id],
@@ -35,30 +27,6 @@ function PhasePage() {
   } = useQuery({
     queryKey: ["phases", id],
     queryFn: () => listProjectPhases({ data: { projectId: id } }),
-  });
-  const { data: members = [] } = useQuery({
-    queryKey: ["members"],
-    queryFn: () => getTeamDirectory(),
-  });
-
-  const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["phases", id] });
-    qc.invalidateQueries({ queryKey: ["project", id] });
-    qc.invalidateQueries({ queryKey: ["projects"] });
-  };
-
-  // Ticking the parent ticks every sub-phase (the server does the cascade).
-  const toggleParent = useMutation({
-    mutationFn: (completed: boolean) =>
-      updateProjectPhase({
-        data: {
-          projectId: id,
-          phaseId,
-          changes: { status: completed ? "completed" : "in_progress" },
-        },
-      }),
-    onSuccess: refresh,
-    onError: (e: Error) => toast.error(e.message),
   });
 
   const phase = phases.find((p) => p.id === phaseId);
@@ -88,60 +56,44 @@ function PhasePage() {
       </div>
     );
 
-  const subs = phase.sub_phases ?? [];
-  const done = subs.filter((s) => s.completed).length;
-  const pct = subs.length ? Math.round((done / subs.length) * 100) : phase.completed ? 100 : 0;
-  const owner = members.find((m) => m.id === phase.assigned_to);
-
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       {back}
 
-      <Card className="p-4 sm:p-6 space-y-4">
+      <Card className="p-4 sm:p-6 space-y-5">
         <div className="flex items-start gap-3">
-          <Checkbox
-            className="mt-1.5"
-            checked={!!phase.completed}
-            disabled={!canManage || toggleParent.isPending}
-            onCheckedChange={(v) => toggleParent.mutate(!!v)}
-          />
           <div className="flex-1 min-w-0">
-            <h1
-              className={`text-xl sm:text-2xl font-bold break-words ${phase.completed ? "line-through text-muted-foreground" : ""}`}
-            >
-              {phase.name}
-            </h1>
-            <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap mt-1">
-              <Calendar className="h-3.5 w-3.5" /> {fmtDate(phase.start_date)} →{" "}
-              {fmtDate(phase.end_date)}
-              <span>· {owner?.full_name ?? "Unassigned"}</span>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              {project?.name ?? "Project"} · Phase
             </p>
+            <h1 className="text-xl sm:text-2xl font-bold break-words mt-1">{phase.name}</h1>
           </div>
           <Badge variant="secondary" className={`${statusColor(phase.status)} shrink-0`}>
             {statusLabel(phase.status)}
           </Badge>
         </div>
-        {phase.notes && (
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{phase.notes}</p>
-        )}
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>
-              {subs.length ? `${done} of ${subs.length} sub-phases done` : "No sub-phases yet"}
-            </span>
-            <span>{pct}%</span>
-          </div>
-          <Progress value={pct} />
-        </div>
-      </Card>
 
-      <Card className="p-4 sm:p-6">
-        <h2 className="font-semibold mb-1">Sub-phases</h2>
-        <p className="text-xs text-muted-foreground mb-4">
-          When every sub-phase is ticked the phase is marked done automatically, and ticking the
-          phase ticks all of them.
-        </p>
-        <SubPhases bare projectId={id} phase={phase} canManage={!!canManage} onChanged={refresh} />
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Start Date</p>
+            <p className="mt-1 flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" /> {fmtDate(phase.start_date)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">End Date</p>
+            <p className="mt-1 flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" /> {fmtDate(phase.end_date)}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Notes</p>
+          <p className="mt-1 text-sm whitespace-pre-wrap break-words">
+            {phase.notes || <span className="text-muted-foreground">No notes.</span>}
+          </p>
+        </div>
       </Card>
     </div>
   );

@@ -1,30 +1,28 @@
 // Shared document shapes for the MongoDB collections (replaces the generated Supabase types).
+import type { ProjectStatus, ProjectType } from "./project-status";
+export type { ProjectStatus, ProjectType } from "./project-status";
 export type AppRole = "Super_Admin" | "Admin" | "SEO" | "Developer";
-export type Priority = "low" | "medium" | "high" | "critical";
-export type TaskStatus = "pending" | "in_progress" | "blocked" | "testing" | "completed";
+// Highest first, the order they are offered in.
+export const PRIORITIES = ["critical", "high", "medium", "low"] as const;
+export type Priority = (typeof PRIORITIES)[number];
+export const TASK_STATUSES = ["completed", "in_progress", "not_started", "blocked"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+/** Tasks still to be finished; these show under a project's Ongoing Tasks. */
+export const ONGOING_TASK_STATUSES: readonly TaskStatus[] = ["not_started", "in_progress"];
 export type PhaseStatus = "not_started" | "in_progress" | "completed" | "blocked";
-export type Availability = "available" | "busy" | "on_leave";
-export type ProjectStatus =
-  | "planning"
-  | "requirement_gathering"
-  | "design"
-  | "development"
-  | "api_integration"
-  | "crm_integration"
-  | "testing"
-  | "deployment"
-  | "client_review"
-  | "live"
-  | "in_progress"
-  | "maintenance"
-  | "completed"
-  | "on_hold"
-  | "cancelled";
+export const AVAILABILITY = ["available", "busy", "focus", "wfh", "on_leave"] as const;
+export type Availability = (typeof AVAILABILITY)[number];
+export const DEPARTMENTS = ["Tech", "SEO", "Tech & SEO"] as const;
+export type Department = (typeof DEPARTMENTS)[number];
 
 export interface UserDoc {
   id: string;
   email: string;
   password_hash: string;
+  /** false = disabled by an admin (cannot sign in). Missing means active. */
+  active?: boolean;
+  /** Unix seconds of the last password change; sessions signed before it are rejected. */
+  password_changed_at?: number;
   created_at: string;
 }
 export interface ProfileDoc {
@@ -58,33 +56,25 @@ export interface ProjectDoc {
   start_date: string | null;
   expected_delivery_date: string | null;
   actual_delivery_date: string | null;
+  /** Tech or SEO. Missing on projects saved before types existed (treated as Tech). */
+  project_type: ProjectType;
   status: ProjectStatus;
   priority: Priority;
   technology_stack: string[] | null;
   progress: number;
   notes: string | null;
   created_by: string | null;
+  /** Single-threaded owner. */
   lead_id: string | null;
-  maintainer_id: string | null;
-  isMaintenable: boolean;
   created_at: string;
   updated_at: string;
+  /** Projects can no longer be archived; ones archived earlier stay hidden. */
   archived_at?: string | null;
 }
-export interface SubPhaseDoc {
-  id: string;
-  name: string;
-  completed: boolean;
-  created_at: string;
-  start_date?: string | null;
-  end_date?: string | null;
-}
 export interface PhaseDoc {
-  sub_phases?: SubPhaseDoc[];
   id: string;
   project_id: string;
   name: string;
-  assigned_to: string | null;
   start_date: string | null;
   end_date: string | null;
   status: PhaseStatus;
@@ -94,18 +84,21 @@ export interface PhaseDoc {
   created_at: string;
   updated_at: string;
 }
+/** One line of a person's daily work log. Tasks are not linked to phases. */
 export interface TaskDoc {
   id: string;
+  /** The day the work is logged for (YYYY-MM-DD). */
+  task_date: string;
+  /** Null only when the project was removed later. */
   project_id: string | null;
+  /** The task itself (free text, may span several lines). */
   name: string;
-  description: string | null;
+  /** Whose task this is: the person who logged it. Null if that account was deleted. */
   assigned_to: string | null;
-  due_date: string | null;
   priority: Priority;
   status: TaskStatus;
-  phase_id?: string | null;
-  estimated_hours: number | null;
-  actual_hours: number | null;
+  start_date: string | null;
+  end_date: string | null;
   notes: string | null;
   created_by: string | null;
   created_at: string;

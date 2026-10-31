@@ -160,9 +160,10 @@ function RootComponent() {
       <Outlet />
       <Toaster
         richColors
-        position="top-right"
-        offset={{ top: "max(16px, env(safe-area-inset-top))" }}
-        mobileOffset={{ top: "max(12px, env(safe-area-inset-top))" }}
+        position="bottom-right"
+        offset={{ bottom: "max(16px, env(safe-area-inset-bottom))" }}
+        // On phones, sit above the fixed bottom tab bar (h-16).
+        mobileOffset={{ bottom: "calc(4rem + 12px + env(safe-area-inset-bottom))" }}
       />
     </QueryClientProvider>
   );

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAuth } from "./auth-middleware";
+import { PROJECT_STATUSES, PROJECT_TYPES } from "./project-status";
 
 const id = z.string().trim().min(1).max(100);
 const nullableText = z.string().trim().max(10000).nullable();
@@ -14,24 +15,9 @@ const date = z
   }, "Invalid date")
   .nullable();
 const priority = z.enum(["low", "medium", "high", "critical"]);
-const status = z.enum([
-  "planning",
-  "requirement_gathering",
-  "design",
-  "development",
-  "api_integration",
-  "crm_integration",
-  "testing",
-  "deployment",
-  "client_review",
-  "live",
-  "in_progress",
-  "maintenance",
-  "completed",
-  "on_hold",
-  "cancelled",
-]);
-export const projectSchema = z
+// Which statuses fit which project type is checked on the server, where the type is known.
+const status = z.enum(PROJECT_STATUSES);
+export const projectFields = z
   .object({
     name: z.string().trim().min(1).max(200),
     description: nullableText.optional(),
@@ -50,29 +36,17 @@ export const projectSchema = z
     notes: nullableText.optional(),
     technology_stack: z.array(z.string().trim().min(1).max(100)).max(100).nullable().optional(),
     lead_id: userId.optional(),
-    maintainer_id: userId.optional(),
-    isMaintenable: z.boolean().optional(),
   })
   .strict();
+// The type is chosen once, at creation: statuses, phases and team all depend on it.
+export const projectSchema = projectFields.extend({ project_type: z.enum(PROJECT_TYPES) });
 export const phaseSchema = z
   .object({
     name: z.string().trim().min(1).max(200),
-    assigned_to: userId.optional(),
     start_date: date.optional(),
     end_date: date.optional(),
     notes: nullableText.optional(),
     status: z.enum(["not_started", "in_progress", "completed", "blocked"]).optional(),
-  })
-  .strict();
-export const taskSchema = z
-  .object({
-    name: z.string().trim().min(1).max(200),
-    description: nullableText.optional(),
-    assigned_to: userId.optional(),
-    phase_id: id.nullable().optional(),
-    due_date: date.optional(),
-    priority: priority.optional(),
-    status: z.enum(["pending", "in_progress", "blocked", "testing", "completed"]).optional(),
   })
   .strict();
 const projectId = z.object({ id }).strict();
@@ -80,12 +54,14 @@ const relatedId = z.object({ projectId: id }).strict();
 
 export const listProjects = createServerFn({ method: "GET" })
   .middleware([requireAuth])
-  .handler(async () => (await import("./projects.server")).listProjects());
+  .handler(async ({ context }) => (await import("./projects.server")).listProjects(context));
 
 export const getProject = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .validator((data: unknown) => projectId.parse(data))
-  .handler(async ({ data }) => (await import("./projects.server")).getProject(data.id));
+  .handler(async ({ data, context }) =>
+    (await import("./projects.server")).getProject(context, data.id),
+  );
 
 export const createProject = createServerFn({ method: "POST" })
   .middleware([requireAuth])
@@ -100,7 +76,7 @@ export const updateProject = createServerFn({ method: "POST" })
     z
       .object({
         id,
-        changes: projectSchema
+        changes: projectFields
           .partial()
           .refine((v) => Object.keys(v).length > 0, "No changes supplied"),
       })
@@ -111,31 +87,11 @@ export const updateProject = createServerFn({ method: "POST" })
     (await import("./projects.server")).updateProject(context, data.id, data.changes),
   );
 
-export const archiveProject = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .validator((data: unknown) => projectId.parse(data))
-  .handler(async ({ data, context }) =>
-    (await import("./projects.server")).archiveProject(context, data.id),
-  );
-
-export const listArchivedProjects = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
-  .handler(async ({ context }) =>
-    (await import("./projects.server")).listArchivedProjects(context),
-  );
-
-export const restoreProject = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .validator((data: unknown) => projectId.parse(data))
-  .handler(async ({ data, context }) =>
-    (await import("./projects.server")).restoreProject(context, data.id),
-  );
-
 export const listProjectPhases = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .validator((data: unknown) => relatedId.parse(data))
-  .handler(async ({ data }) =>
-    (await import("./projects.server")).listProjectPhases(data.projectId),
+  .handler(async ({ data, context }) =>
+    (await import("./projects.server")).listProjectPhases(context, data.projectId),
   );
 
 export const createProjectPhase = createServerFn({ method: "POST" })
@@ -175,25 +131,19 @@ export const seedProjectPhases = createServerFn({ method: "POST" })
     (await import("./projects.server")).seedProjectPhases(context, data.projectId),
   );
 
-export const listProjectTasks = createServerFn({ method: "GET" })
+// Not-started and in-progress tasks logged against a project.
+export const listOngoingTasks = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .validator((data: unknown) => relatedId.parse(data))
-  .handler(async ({ data }) =>
-    (await import("./projects.server")).listProjectTasks(data.projectId),
-  );
-
-export const createProjectTask = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .validator((data: unknown) => z.object({ projectId: id, task: taskSchema }).strict().parse(data))
   .handler(async ({ data, context }) =>
-    (await import("./projects.server")).createProjectTask(context, data.projectId, data.task),
+    (await import("./projects.server")).listOngoingTasks(context, data.projectId),
   );
 
 export const listProjectMembers = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .validator((data: unknown) => relatedId.parse(data))
-  .handler(async ({ data }) =>
-    (await import("./projects.server")).listProjectMembers(data.projectId),
+  .handler(async ({ data, context }) =>
+    (await import("./projects.server")).listProjectMembers(context, data.projectId),
   );
 
 export const addProjectMember = createServerFn({ method: "POST" })
@@ -212,72 +162,6 @@ export const removeProjectMember = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) =>
     (await import("./projects.server")).removeProjectMember(context, data.projectId, data.userId),
-  );
-
-const subPhaseIds = z.object({ projectId: id, phaseId: id });
-
-export const addSubPhases = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .validator((data: unknown) =>
-    subPhaseIds
-      .extend({
-        names: z.array(z.string().trim().min(1).max(200)).min(1).max(50),
-        start_date: date.optional(),
-        end_date: date.optional(),
-      })
-      .strict()
-      .parse(data),
-  )
-  .handler(async ({ data, context }) =>
-    (await import("./projects.server")).addSubPhases(
-      context,
-      data.projectId,
-      data.phaseId,
-      data.names,
-      { start_date: data.start_date, end_date: data.end_date },
-    ),
-  );
-
-export const updateSubPhase = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .validator((data: unknown) =>
-    subPhaseIds
-      .extend({
-        subId: id,
-        changes: z
-          .object({
-            name: z.string().trim().min(1).max(200),
-            completed: z.boolean(),
-            start_date: date,
-            end_date: date,
-          })
-          .partial()
-          .strict()
-          .refine((v) => Object.keys(v).length > 0, "No changes supplied"),
-      })
-      .strict()
-      .parse(data),
-  )
-  .handler(async ({ data, context }) =>
-    (await import("./projects.server")).updateSubPhase(
-      context,
-      data.projectId,
-      data.phaseId,
-      data.subId,
-      data.changes,
-    ),
-  );
-
-export const deleteSubPhase = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .validator((data: unknown) => subPhaseIds.extend({ subId: id }).strict().parse(data))
-  .handler(async ({ data, context }) =>
-    (await import("./projects.server")).deleteSubPhase(
-      context,
-      data.projectId,
-      data.phaseId,
-      data.subId,
-    ),
   );
 
 export type ProjectInput = z.infer<typeof projectSchema>;

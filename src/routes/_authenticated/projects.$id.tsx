@@ -6,14 +6,12 @@ import {
   type ProjectInput,
   getProject,
   updateProject,
-  archiveProject,
   listProjectPhases,
   createProjectPhase,
   updateProjectPhase,
   deleteProjectPhase,
   seedProjectPhases,
-  listProjectTasks,
-  createProjectTask,
+  listOngoingTasks,
   listProjectMembers,
   addProjectMember,
   removeProjectMember,
@@ -52,55 +50,39 @@ import {
   Users,
   Pencil,
   Crown,
-  Wrench,
   UserPlus,
   X,
+  ListTodo,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectTimeline } from "@/components/project-timeline";
+import { TaskTable } from "@/components/task-table";
 import { ProjectDetailSkeleton, ListRowsSkeleton } from "@/components/skeletons";
-import { statusLabel, statusColor, priorityColor, maintenableColor, fmtDate } from "@/lib/format";
-import { useCurrentUser, canManageProjects, canAssignTasks } from "@/hooks/use-current-user";
-import type { PhaseDoc, ProjectDoc, Priority, PhaseStatus, TaskStatus } from "@/lib/types";
+import {
+  statusLabel,
+  statusColor,
+  priorityColor,
+  priorityLabel,
+  projectTypeColor,
+  fmtDate,
+} from "@/lib/format";
+import {
+  PROJECT_TYPE_LABEL,
+  canWorkOn,
+  defaultPhasesFor,
+  projectTypeOf,
+  statusesFor,
+} from "@/lib/project-status";
+import { useCurrentUser, canManageProjects } from "@/hooks/use-current-user";
+import type { PhaseDoc, ProjectDoc, Priority, PhaseStatus } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({
   head: () => ({ meta: [{ title: "Project — Marko Projects" }] }),
   component: ProjectDetail,
 });
 
-const DEFAULT_PHASES = [
-  "Requirement Gathering",
-  "UI/UX Design",
-  "Frontend Development",
-  "Backend Development",
-  "API Integration",
-  "CRM Integration",
-  "Database Setup",
-  "Testing & QA",
-  "Deployment",
-  "Client Review",
-  "Maintenance",
-];
-const TASK_STATUSES = ["pending", "in_progress", "blocked", "testing", "completed"];
 const PRIORITIES = ["low", "medium", "high", "critical"];
 const PHASE_STATUSES = ["not_started", "in_progress", "completed", "blocked"];
-const PROJECT_STATUSES = [
-  "planning",
-  "requirement_gathering",
-  "design",
-  "development",
-  "api_integration",
-  "crm_integration",
-  "testing",
-  "deployment",
-  "client_review",
-  "live",
-  "in_progress",
-  "maintenance",
-  "completed",
-  "on_hold",
-  "cancelled",
-];
 
 type TeamMember = Awaited<ReturnType<typeof getTeamDirectory>>[number];
 
@@ -118,7 +100,6 @@ function ProjectDetail() {
   const navigate = useNavigate();
   const { data: me } = useCurrentUser();
   const canManage = canManageProjects(me?.role);
-  const canAssign = canAssignTasks(me?.role);
 
   const {
     data: project,
@@ -134,14 +115,14 @@ function ProjectDetail() {
     queryFn: () => listProjectPhases({ data: { projectId: id } }),
   });
 
-  const { data: tasks = [], error: tasksError } = useQuery({
-    queryKey: ["tasks", id],
-    queryFn: () => listProjectTasks({ data: { projectId: id } }),
-  });
-
   const { data: members = [] } = useQuery({
     queryKey: ["members"],
     queryFn: () => getTeamDirectory(),
+  });
+
+  const { data: ongoingTasks = [], isLoading: tasksLoading } = useQuery({
+    queryKey: ["ongoing-tasks", id],
+    queryFn: () => listOngoingTasks({ data: { projectId: id } }),
   });
 
   const { data: projectMembers = [], error: membersError } = useQuery({
@@ -210,22 +191,13 @@ function ProjectDetail() {
       await updateProject({ data: { id, changes } });
       qc.invalidateQueries({ queryKey: ["project", id] });
       qc.invalidateQueries({ queryKey: ["projects"] });
+      // Choosing an owner also adds them to the team on the server.
+      if (changes.lead_id) qc.invalidateQueries({ queryKey: ["project-members", id] });
       toast.success(message);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save project.");
     }
   };
-
-  const archive = useMutation({
-    mutationFn: () => archiveProject({ data: { id } }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["projects"] });
-      qc.removeQueries({ queryKey: ["project", id] });
-      toast.success("Project archived");
-      navigate({ to: "/projects" });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   if (projectLoading) return <ProjectDetailSkeleton />;
   if (projectError)
@@ -245,13 +217,14 @@ function ProjectDetail() {
       Number(a.completed) - Number(b.completed) ||
       (a.end_date ?? "9999-12-31").localeCompare(b.end_date ?? "9999-12-31"),
   );
-  const safeTasks = Array.isArray(tasks) ? tasks : [];
   const memberIds = safeProjectMembers.map((m) => m.user_id).filter(Boolean);
   const workingMembers = safeMembers.filter((m) => memberIds.includes(m.id));
-  // Members assigned to this project may add phases and edit/archive it, alongside admins.
+  // Members assigned to this project may add phases and edit it, alongside admins.
   const canEditProject = canManage || (!!me?.user.id && memberIds.includes(me.user.id));
   const sto = safeMembers.find((m) => m.id === project.lead_id);
-  const maintainer = safeMembers.find((m) => m.id === project.maintainer_id);
+  const projectType = projectTypeOf(project);
+  // Tech projects are staffed by Tech people, SEO projects by SEO people.
+  const eligibleMembers = safeMembers.filter((m) => canWorkOn(projectType, m.department));
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -266,8 +239,11 @@ function ProjectDetail() {
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2 flex-wrap">
             <h1 className="text-2xl sm:text-3xl font-bold break-words min-w-0">{project.name}</h1>
+            <Badge variant="outline" className={projectTypeColor(projectType)}>
+              {PROJECT_TYPE_LABEL[projectType]}
+            </Badge>
             <Badge variant="secondary" className={priorityColor(project.priority)}>
-              {project.priority}
+              {priorityLabel(project.priority)}
             </Badge>
           </div>
           <p className="text-muted-foreground mt-1 max-w-3xl break-words">{project.description}</p>
@@ -282,54 +258,12 @@ function ProjectDetail() {
                   qc.invalidateQueries({ queryKey: ["projects"] });
                 }}
               />
-              <Button
-                variant="outline"
-                disabled={archive.isPending}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Archive this project? It will be hidden from the project list. Its records will be kept.",
-                    )
-                  )
-                    archive.mutate();
-                }}
-              >
-                Archive Project
-              </Button>
-              <Select
-                value={project.isMaintenable ? "yes" : "no"}
-                onValueChange={(v) =>
-                  saveProjectChange({ isMaintenable: v === "yes" }, "Maintenance updated")
-                }
-              >
-                <SelectTrigger
-                  className={`w-full sm:w-44 font-medium ${
-                    project.isMaintenable
-                      ? "bg-success/15 text-success border-success/40"
-                      : "bg-destructive/10 text-destructive border-destructive/40"
-                  }`}
-                >
-                  Maintenable
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="yes">
-                    <Badge variant="secondary" className={maintenableColor(true)}>
-                      Yes
-                    </Badge>
-                  </SelectItem>
-                  <SelectItem value="no">
-                    <Badge variant="secondary" className={maintenableColor(false)}>
-                      No
-                    </Badge>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
               <Select value={project.status} onValueChange={(v) => updateStatus.mutate(v)}>
-                <SelectTrigger className="w-full sm:w-48">
+                <SelectTrigger className="w-full sm:w-64">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PROJECT_STATUSES.map((s) => (
+                  {statusesFor(projectType).map((s) => (
                     <SelectItem key={s} value={s}>
                       {statusLabel(s)}
                     </SelectItem>
@@ -392,7 +326,7 @@ function ProjectDetail() {
         </Card>
       </div>
 
-      {(phasesError || tasksError || membersError) && (
+      {(phasesError || membersError) && (
         <p className="text-destructive">
           Some project details could not be loaded. Refresh to try again.
         </p>
@@ -401,7 +335,7 @@ function ProjectDetail() {
         <TabsList>
           <TabsTrigger value="phases">Phases</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="tasks">Ongoing Tasks</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
         </TabsList>
 
@@ -412,13 +346,17 @@ function ProjectDetail() {
               {canEditProject && (
                 <div className="flex gap-2 flex-wrap">
                   {canManage && safePhases.length === 0 && (
-                    <Button variant="outline" onClick={() => seedPhases.mutate()}>
-                      Seed Default Phases
+                    <Button
+                      variant="outline"
+                      disabled={seedPhases.isPending}
+                      title={defaultPhasesFor(projectType).join(" → ")}
+                      onClick={() => seedPhases.mutate()}
+                    >
+                      Add {PROJECT_TYPE_LABEL[projectType]} Phases
                     </Button>
                   )}
                   <AddPhaseDialog
                     projectId={id}
-                    members={safeMembers}
                     onAdded={() => {
                       qc.invalidateQueries({ queryKey: ["phases", id] });
                       recomputeProgress();
@@ -432,8 +370,6 @@ function ProjectDetail() {
             ) : (
               <div className="space-y-2">
                 {orderedPhases.map((ph) => {
-                  const owner = safeMembers.find((m) => m.id === ph.assigned_to);
-                  const subs = ph.sub_phases ?? [];
                   return (
                     <div
                       key={ph.id}
@@ -457,15 +393,9 @@ function ProjectDetail() {
                               title="Open phase"
                             >
                               {ph.name}
-                              {subs.length > 0 && (
-                                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                  {subs.filter((x) => x.completed).length}/{subs.length} sub-phases
-                                </span>
-                              )}
                             </Link>
                             <p className="text-xs text-muted-foreground break-words">
-                              {owner?.full_name ?? "Unassigned"} · {fmtDate(ph.start_date)} →{" "}
-                              {fmtDate(ph.end_date)}
+                              {fmtDate(ph.start_date)} → {fmtDate(ph.end_date)}
                             </p>
                           </div>
                         </div>
@@ -485,7 +415,6 @@ function ProjectDetail() {
                             <>
                               <EditPhaseDialog
                                 phase={ph}
-                                members={safeMembers}
                                 onSaved={() => {
                                   qc.invalidateQueries({ queryKey: ["phases", id] });
                                   recomputeProgress();
@@ -515,8 +444,6 @@ function ProjectDetail() {
             <ProjectTimeline
               project={project}
               phases={safePhases}
-              tasks={safeTasks}
-              members={safeMembers}
               canEdit={!!canManage}
               onOpenPhase={(phaseId) =>
                 navigate({ to: "/projects/$id/phases/$phaseId", params: { id, phaseId } })
@@ -531,51 +458,30 @@ function ProjectDetail() {
         </TabsContent>
 
         <TabsContent value="tasks" className="space-y-4">
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h3 className="font-semibold">Tasks</h3>
-              {canAssign && (
-                <NewTaskDialog
-                  projectId={id}
-                  members={safeMembers}
-                  phases={safePhases}
-                  onAdded={() => qc.invalidateQueries({ queryKey: ["tasks", id] })}
-                />
-              )}
-            </div>
-            {safeTasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No tasks yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {safeTasks.map((t) => {
-                  const owner = safeMembers.find((m) => m.id === t.assigned_to);
-                  return (
-                    <div
-                      key={t.id}
-                      className="p-3 rounded-lg border border-border flex items-center gap-3 flex-wrap"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium">{t.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {owner?.full_name ?? "Unassigned"}
-                          {safePhases.find((ph) => ph.id === t.phase_id)
-                            ? ` · ${safePhases.find((ph) => ph.id === t.phase_id)?.name ?? ""}`
-                            : ""}{" "}
-                          · Due {fmtDate(t.due_date)}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className={priorityColor(t.priority)}>
-                        {t.priority}
-                      </Badge>
-                      <Badge variant="secondary" className={statusColor(t.status)}>
-                        {statusLabel(t.status)}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
+          {/* Not-started and in-progress tasks people have logged against this project. */}
+          {tasksLoading ? (
+            <Card className="p-6">
+              <ListRowsSkeleton rows={3} />
+            </Card>
+          ) : ongoingTasks.length === 0 ? (
+            <Card className="p-12 text-center">
+              <ListTodo className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
+              <h3 className="font-semibold">No ongoing tasks</h3>
+              <p className="text-sm text-muted-foreground">
+                Tasks that are not started or in progress for this project show here.
+              </p>
+            </Card>
+          ) : (
+            <Card className="overflow-hidden">
+              <TaskTable
+                tasks={ongoingTasks}
+                showProject={false}
+                ownerName={(t) =>
+                  safeMembers.find((m) => m.id === t.assigned_to)?.full_name ?? "Former member"
+                }
+              />
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="team" className="space-y-4">
@@ -587,20 +493,10 @@ function ProjectDetail() {
                 member={sto}
                 canEdit={canManage}
                 value={project.lead_id}
-                members={safeMembers}
+                members={eligibleMembers}
+                emptyText={`No ${PROJECT_TYPE_LABEL[projectType]} members yet`}
                 onChange={async (uid: string) => {
                   await saveProjectChange({ lead_id: uid || null }, "STO updated");
-                }}
-              />
-              <RoleSlot
-                label="Maintainer"
-                icon={<Wrench className="h-4 w-4 text-primary" />}
-                member={maintainer}
-                canEdit={canManage}
-                value={project.maintainer_id}
-                members={safeMembers}
-                onChange={async (uid: string) => {
-                  await saveProjectChange({ maintainer_id: uid || null }, "Maintainer updated");
                 }}
               />
             </div>
@@ -611,10 +507,12 @@ function ProjectDetail() {
               <h3 className="font-semibold flex items-center gap-2">
                 <Users className="h-4 w-4" /> Currently Working On
               </h3>
-              {canManage && (
+              {/* Team members manage this list too; only admins choose the owner above. */}
+              {canEditProject && (
                 <AssignMembersDialog
                   projectId={id}
-                  members={safeMembers}
+                  department={PROJECT_TYPE_LABEL[projectType]}
+                  members={eligibleMembers}
                   current={memberIds}
                   onSaved={() => qc.invalidateQueries({ queryKey: ["project-members", id] })}
                 />
@@ -645,11 +543,15 @@ function ProjectDetail() {
                           {m.designation ?? ""}
                         </p>
                       </div>
-                      {canManage && (
+                      {canEditProject && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="Remove"
+                          // The owner stays on the team until someone else is made owner.
+                          disabled={isSto}
+                          title={
+                            isSto ? "Single-threaded owner — change the owner to remove" : "Remove"
+                          }
                           onClick={async () => {
                             try {
                               await removeProjectMember({ data: { projectId: id, userId: m.id } });
@@ -683,6 +585,7 @@ function RoleSlot({
   canEdit,
   value,
   members,
+  emptyText,
   onChange,
 }: {
   label: string;
@@ -691,6 +594,7 @@ function RoleSlot({
   canEdit: boolean;
   value: string | null;
   members: TeamMember[];
+  emptyText: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -724,6 +628,9 @@ function RoleSlot({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">— Unassigned —</SelectItem>
+              {members.length === 0 && (
+                <div className="px-3 py-2 text-sm text-muted-foreground">{emptyText}</div>
+              )}
               {members.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   {m.full_name ?? m.email}
@@ -739,11 +646,13 @@ function RoleSlot({
 
 function AssignMembersDialog({
   projectId,
+  department,
   members,
   current,
   onSaved,
 }: {
   projectId: string;
+  department: string;
   members: TeamMember[];
   current: string[];
   onSaved: () => void;
@@ -777,7 +686,7 @@ function AssignMembersDialog({
           <DialogTitle>Assign a team member</DialogTitle>
         </DialogHeader>
         <div className="space-y-2">
-          <Label>Team member</Label>
+          <Label>{department} team member</Label>
           <Select value={pick} onValueChange={setPick}>
             <SelectTrigger>
               <SelectValue placeholder="Choose…" />
@@ -785,7 +694,9 @@ function AssignMembersDialog({
             <SelectContent>
               {available.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                  Everyone is already assigned.
+                  {members.length === 0
+                    ? `No members in the ${department} department.`
+                    : "Everyone is already assigned."}
                 </div>
               ) : (
                 available.map((m) => (
@@ -937,7 +848,7 @@ function EditProjectDialog({ project, onSaved }: { project: ProjectDoc; onSaved:
               <SelectContent>
                 {PRIORITIES.map((p) => (
                   <SelectItem key={p} value={p}>
-                    {statusLabel(p)}
+                    {priorityLabel(p)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -961,19 +872,10 @@ function EditProjectDialog({ project, onSaved }: { project: ProjectDoc; onSaved:
   );
 }
 
-function AddPhaseDialog({
-  projectId,
-  members,
-  onAdded,
-}: {
-  projectId: string;
-  members: TeamMember[];
-  onAdded: () => void;
-}) {
+function AddPhaseDialog({ projectId, onAdded }: { projectId: string; onAdded: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
-    assigned_to: "",
     start_date: "",
     end_date: "",
     status: "not_started",
@@ -986,7 +888,6 @@ function AddPhaseDialog({
           projectId,
           phase: {
             name: form.name,
-            assigned_to: form.assigned_to || null,
             start_date: form.start_date || null,
             end_date: form.end_date || null,
             status: form.status as PhaseStatus,
@@ -1001,7 +902,6 @@ function AddPhaseDialog({
       setOpen(false);
       setForm({
         name: "",
-        assigned_to: "",
         start_date: "",
         end_date: "",
         status: "not_started",
@@ -1026,24 +926,6 @@ function AddPhaseDialog({
           <div className="space-y-2">
             <Label>Phase name *</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Assign to</Label>
-            <Select
-              value={form.assigned_to}
-              onValueChange={(v) => setForm({ ...form, assigned_to: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose member" />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.full_name ?? m.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -1094,183 +976,10 @@ function AddPhaseDialog({
   );
 }
 
-function NewTaskDialog({
-  projectId,
-  members,
-  phases,
-  onAdded,
-}: {
-  projectId: string;
-  members: TeamMember[];
-  phases: PhaseDoc[];
-  onAdded: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    assigned_to: "",
-    phase_id: "",
-    due_date: "",
-    priority: "medium",
-    status: "pending",
-  });
-  const m = useMutation({
-    mutationFn: async () => {
-      await createProjectTask({
-        data: {
-          projectId,
-          task: {
-            name: form.name,
-            description: form.description || null,
-            assigned_to: form.assigned_to || null,
-            phase_id: form.phase_id || null,
-            due_date: form.due_date || null,
-            priority: form.priority as Priority,
-            status: form.status as TaskStatus,
-          },
-        },
-      });
-    },
-    onSuccess: () => {
-      toast.success("Task created");
-      onAdded();
-      setOpen(false);
-      setForm((f) => ({ ...f, name: "", description: "", phase_id: "" }));
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          New Task
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New Task</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-2">
-            <Label>Task name *</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Assign to</Label>
-              <Select
-                value={form.assigned_to}
-                onValueChange={(v) => setForm({ ...form, assigned_to: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.full_name ?? m.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2 col-span-2">
-              <Label>Phase{phases.length ? " *" : ""}</Label>
-              <Select
-                value={form.phase_id}
-                onValueChange={(v) => setForm({ ...form, phase_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={phases.length ? "Select a phase" : "No phases yet (not required)"}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {phases.map((ph) => (
-                    <SelectItem key={ph.id} value={ph.id}>
-                      {ph.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Due Date</Label>
-              <DatePicker
-                value={form.due_date}
-                onChange={(v) => setForm({ ...form, due_date: v })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select
-                value={form.priority}
-                onValueChange={(v) => setForm({ ...form, priority: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORITIES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {statusLabel(p)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TASK_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {statusLabel(s)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button
-            disabled={!form.name || (phases.length > 0 && !form.phase_id) || m.isPending}
-            onClick={() => m.mutate()}
-          >
-            Create
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function EditPhaseDialog({
-  phase,
-  members,
-  onSaved,
-}: {
-  phase: PhaseDoc;
-  members: TeamMember[];
-  onSaved: () => void;
-}) {
+function EditPhaseDialog({ phase, onSaved }: { phase: PhaseDoc; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: phase.name ?? "",
-    assigned_to: phase.assigned_to ?? "",
     start_date: phase.start_date ?? "",
     end_date: phase.end_date ?? "",
     status: phase.status ?? "not_started",
@@ -1284,7 +993,6 @@ function EditPhaseDialog({
           phaseId: phase.id,
           changes: {
             name: form.name,
-            assigned_to: form.assigned_to || null,
             start_date: form.start_date || null,
             end_date: form.end_date || null,
             status: form.status as PhaseStatus,
@@ -1315,24 +1023,6 @@ function EditPhaseDialog({
           <div className="space-y-2">
             <Label>Phase name *</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Assign to</Label>
-            <Select
-              value={form.assigned_to}
-              onValueChange={(v) => setForm({ ...form, assigned_to: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose member" />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.full_name ?? m.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

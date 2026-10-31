@@ -6,27 +6,36 @@ import {
   ListTodo,
   Users,
   ClipboardList,
-  Settings,
   LogOut,
-  Bell,
   Menu,
+  Check,
+  ChevronDown,
+  UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { getSession, logout, listActivity } from "@/lib/app.functions";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AvailabilityIcon, WithStatus } from "@/components/availability-status";
+import { availabilityLabel } from "@/lib/format";
+import { AVAILABILITY, type Availability } from "@/lib/types";
+import { toast } from "sonner";
+import { useCurrentUser, canManageProjects, type AppRole } from "@/hooks/use-current-user";
+import { getSession, logout, setMyAvailability } from "@/lib/app.functions";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", short: "Home", icon: LayoutDashboard },
   { to: "/projects", label: "Projects", short: "Projects", icon: FolderKanban },
   { to: "/tasks", label: "Tasks", short: "Tasks", icon: ListTodo },
-  { to: "/logs", label: "Daily Logs", short: "Logs", icon: ClipboardList },
   { to: "/team", label: "Team", short: "Team", icon: Users },
+  // Admin / Super Admin only — kept last in the list.
+  { to: "/logs", label: "Application Logs", short: "Logs", icon: ClipboardList, adminOnly: true },
 ] as const;
+
+const navFor = (role?: AppRole) =>
+  nav.filter((item) => !("adminOnly" in item && item.adminOnly) || canManageProjects(role));
 
 const roleLabel: Record<string, string> = {
   Super_Admin: "Super Admin",
@@ -40,16 +49,18 @@ const isActive = (pathname: string, to: string) => pathname === to || pathname.s
 // `rail` = the desktop sidebar. On tablets (md) it shrinks to an icon-only rail; on lg+ it shows labels.
 function NavList({
   pathname,
+  role,
   onNavigate,
   rail,
 }: {
   pathname: string;
+  role?: AppRole;
   onNavigate?: () => void;
   rail?: boolean;
 }) {
   return (
     <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-      {nav.map((item) => {
+      {navFor(role).map((item) => {
         const active = isActive(pathname, item.to);
         const Icon = item.icon;
         return (
@@ -105,7 +116,7 @@ function SidebarBody({
         />
         <span className={cn("truncate", rail && "md:max-lg:hidden")}>Marko Projects</span>
       </div>
-      <NavList pathname={pathname} onNavigate={onNavigate} rail={rail} />
+      <NavList pathname={pathname} role={me?.role} onNavigate={onNavigate} rail={rail} />
       <div className="p-3 border-t border-sidebar-border pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Link
           to="/settings"
@@ -149,11 +160,12 @@ function SidebarBody({
 }
 
 /** Phone-only tab bar fixed to the bottom of the screen (app-style navigation for the PWA). */
-function BottomNav({ pathname }: { pathname: string }) {
+function BottomNav({ pathname, role }: { pathname: string; role?: AppRole }) {
+  const items = navFor(role);
   return (
     <nav className="md:hidden fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]">
-      <div className="grid grid-cols-5">
-        {nav.map((item) => {
+      <div className={cn("grid", items.length > 4 ? "grid-cols-5" : "grid-cols-4")}>
+        {items.map((item) => {
           const active = isActive(pathname, item.to);
           const Icon = item.icon;
           return (
@@ -196,6 +208,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     await logout();
     navigate({ to: "/auth", replace: true });
   };
+
+  const firstName =
+    me?.profile?.full_name?.trim().split(/\s+/)[0] || me?.user.email.split("@")[0] || "there";
 
   const initials = (me?.profile?.full_name ?? me?.user.email ?? "U")
     .split(" ")
@@ -241,12 +256,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="truncate">Marko Projects</span>
             </Link>
             <div className="flex-1" />
-            <NotificationsBell userId={me?.user.id} />
-            <Button asChild variant="ghost" size="icon" title="Settings">
-              <Link to="/settings">
-                <Settings className="h-4 w-4" />
-              </Link>
-            </Button>
+            {/* Same avatar as the sidebar footer; opens Settings (my profile). */}
+            <UserMenu
+              firstName={firstName}
+              initials={initials}
+              availability={me?.profile?.availability}
+            />
           </div>
         </header>
         {/* Bottom padding on phones keeps content clear of the fixed tab bar. */}
@@ -255,87 +270,98 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      <BottomNav pathname={pathname} />
+      <BottomNav pathname={pathname} role={me?.role} />
     </div>
   );
 }
 
-type ActivityItem = {
-  id: string;
-  actor_name?: string | null;
-  action: string;
-  entity_name?: string | null;
-  created_at: string;
-};
+/** Header avatar + greeting. Opens a menu to set your status (availability) or go to your profile. */
+function UserMenu({
+  firstName,
+  initials,
+  availability,
+}: {
+  firstName: string;
+  initials: string;
+  availability?: Availability | null;
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const current = availability ?? "available";
 
-function NotificationsBell({ userId }: { userId?: string }) {
-  const storageKey = userId ? `bell-seen:${userId}` : "bell-seen:anon";
-  const [seenAt, setSeenAt] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    return window.localStorage.getItem(storageKey) ?? "";
-  });
-
-  const { data: items = [] } = useQuery<ActivityItem[]>({
-    queryKey: ["bell-activity"],
-    queryFn: async (): Promise<ActivityItem[]> => {
-      const result = await listActivity({ data: { limit: 10 } });
-      return Array.isArray(result) ? (result as ActivityItem[]) : [];
+  const setStatus = useMutation({
+    mutationFn: (value: Availability) => setMyAvailability({ data: { availability: value } }),
+    // Update the header straight away; roll back if the save fails.
+    onMutate: async (value) => {
+      await qc.cancelQueries({ queryKey: ["current-user"] });
+      const previous = qc.getQueryData(["current-user"]);
+      qc.setQueryData(["current-user"], (old: Awaited<ReturnType<typeof getSession>>) =>
+        old?.profile ? { ...old, profile: { ...old.profile, availability: value } } : old,
+      );
+      return { previous };
     },
-    refetchInterval: 60_000,
+    onError: (e: Error, _v, ctx) => {
+      qc.setQueryData(["current-user"], ctx?.previous);
+      toast.error(e.message);
+    },
+    onSuccess: (_r, value) => toast.success(`Status set to ${availabilityLabel(value)}`),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["current-user"] });
+      qc.invalidateQueries({ queryKey: ["team-members"] });
+    },
   });
-
-  const latest = items[0]?.created_at ?? "";
-  const hasNew = !!latest && latest > seenAt;
-
-  const markSeen = () => {
-    if (!latest) return;
-    setSeenAt(latest);
-    if (typeof window !== "undefined") window.localStorage.setItem(storageKey, latest);
-  };
 
   return (
-    <Popover
-      onOpenChange={(o) => {
-        if (o) markSeen();
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" title="Notifications">
-          <Bell className="h-4 w-4" />
-          {hasNew && (
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
-          )}
-        </Button>
+        <button
+          type="button"
+          title={`Status: ${availabilityLabel(current)}`}
+          className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 sm:pr-2 hover:bg-accent/60 transition-colors"
+        >
+          <WithStatus value={current} size="md">
+            <Avatar className="h-8 w-8 md:h-9 md:w-9">
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+          </WithStatus>
+          <span className="hidden sm:inline text-sm font-medium truncate max-w-[10rem]">
+            Hi, {firstName}
+          </span>
+          <ChevronDown className="hidden sm:block h-4 w-4 text-muted-foreground" />
+        </button>
       </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        collisionPadding={12}
-        className="w-[calc(100vw-1.5rem)] max-w-80 p-0"
-      >
-        <div className="p-3 border-b border-border font-semibold text-sm">Recent activity</div>
-        <ul className="max-h-[60dvh] sm:max-h-80 overflow-auto">
-          {items.length === 0 ? (
-            <li className="p-4 text-sm text-muted-foreground">Nothing yet.</li>
-          ) : (
-            items.map((a) => (
-              <li key={a.id} className="p-3 border-b border-border last:border-0 text-sm">
-                <p className="line-clamp-2 break-words">
-                  <b>{a.actor_name ?? "Someone"}</b>{" "}
-                  <span className="text-muted-foreground">{a.action.replace(/[._]/g, " ")}</span>{" "}
-                  <b>{a.entity_name}</b>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(a.created_at).toLocaleString()}
-                </p>
-              </li>
-            ))
-          )}
-        </ul>
-        <div className="p-2 border-t border-border">
-          <Button asChild variant="ghost" size="sm" className="w-full">
-            <Link to="/logs">View all</Link>
-          </Button>
-        </div>
+      <PopoverContent align="end" collisionPadding={12} className="w-56 p-1">
+        <p className="px-2 pt-1.5 pb-1 text-xs font-medium text-muted-foreground">Select status</p>
+        {AVAILABILITY.map((a) => (
+          <button
+            key={a}
+            type="button"
+            disabled={setStatus.isPending}
+            onClick={() => {
+              setOpen(false);
+              if (a !== current) setStatus.mutate(a);
+            }}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent disabled:opacity-60",
+              a === current && "font-medium",
+            )}
+          >
+            <AvailabilityIcon value={a} />
+            <span className="flex-1 text-left">{availabilityLabel(a)}</span>
+            {a === current && <Check className="h-4 w-4 text-muted-foreground" />}
+          </button>
+        ))}
+        <div className="my-1 h-px bg-border" />
+        <Link
+          to="/settings"
+          onClick={() => setOpen(false)}
+          className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent"
+        >
+          <UserRound className="h-4 w-4 text-muted-foreground" />
+          My profile
+        </Link>
       </PopoverContent>
     </Popover>
   );

@@ -1,15 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import {
-  updateMyProfile,
-  listRoleMembers,
-  addRole as addRoleFn,
-  removeRole as removeRoleFn,
-  createUser,
-} from "@/lib/app.functions";
+import { changeMyPassword, updateMyProfile } from "@/lib/app.functions";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,11 +15,10 @@ import {
 } from "@/components/ui/select";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { toast } from "sonner";
-import { ShieldCheck, Trash2, UserPlus, Save } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Save } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
-import { useServerFn } from "@tanstack/react-start";
-import { FormCardSkeleton, ListRowsSkeleton } from "@/components/skeletons";
-import type { AppRole, Availability } from "@/lib/types";
+import { FormCardSkeleton } from "@/components/skeletons";
+import { AVAILABILITY, type Availability } from "@/lib/types";
 import { availabilityLabel } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -34,14 +26,8 @@ export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
 });
 
-const ROLES = ["Developer", "SEO", "Admin", "Super_Admin"] as const;
-const AVAILABILITY = ["available", "busy", "on_leave"] as const;
-
+// Adding members and changing roles now lives in Team → Member Management.
 function SettingsPage() {
-  const { data: me } = useCurrentUser();
-  const isSuper = me?.role === "Super_Admin";
-  const isAdmin = isSuper || me?.role === "Admin";
-
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
@@ -52,10 +38,99 @@ function SettingsPage() {
       </div>
 
       <ProfileForm />
-
-      {isAdmin && <AddUserForm canPromoteSuper={!!isSuper} />}
-      {isSuper && <RoleManager />}
+      <ChangePasswordForm />
     </div>
+  );
+}
+
+const noPasswords = { current: "", next: "", confirm: "" };
+
+/** Members replace the temporary password they were given with their own. */
+function ChangePasswordForm() {
+  const [form, setForm] = useState(noPasswords);
+  const [show, setShow] = useState(false);
+
+  const save = useMutation({
+    mutationFn: () =>
+      changeMyPassword({ data: { current_password: form.current, new_password: form.next } }),
+    onSuccess: () => {
+      toast.success("Password changed. Other devices have been signed out.");
+      setForm(noPasswords);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const tooShort = !!form.next && form.next.length < 6;
+  const mismatch = !!form.confirm && form.next !== form.confirm;
+  const ready = !!form.current && form.next.length >= 6 && form.next === form.confirm;
+  const type = show ? "text" : "password";
+
+  return (
+    <Card className="p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div>
+          <h2 className="font-semibold mb-1">Change Password</h2>
+          <p className="text-xs text-muted-foreground">
+            Replace the temporary password you were given with one only you know.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShow((v) => !v)}
+          aria-label={show ? "Hide passwords" : "Show passwords"}
+        >
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </Button>
+      </div>
+      <form
+        className="grid sm:grid-cols-2 gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (ready) save.mutate();
+        }}
+      >
+        <div className="space-y-2 sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]">
+          <Label htmlFor="current-password">Current password</Label>
+          <Input
+            id="current-password"
+            type={type}
+            autoComplete="current-password"
+            value={form.current}
+            onChange={(e) => setForm({ ...form, current: e.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="new-password">New password</Label>
+          <Input
+            id="new-password"
+            type={type}
+            autoComplete="new-password"
+            value={form.next}
+            onChange={(e) => setForm({ ...form, next: e.target.value })}
+          />
+          {tooShort && <p className="text-xs text-destructive">Use at least 6 characters.</p>}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirm-password">Confirm new password</Label>
+          <Input
+            id="confirm-password"
+            type={type}
+            autoComplete="new-password"
+            value={form.confirm}
+            onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+          />
+          {mismatch && <p className="text-xs text-destructive">Passwords do not match.</p>}
+        </div>
+        <div className="flex justify-end sm:col-span-2 mt-1">
+          <Button type="submit" className="w-full sm:w-auto" disabled={!ready || save.isPending}>
+            <KeyRound className="h-4 w-4 mr-2" />
+            {save.isPending ? "Updating…" : "Update password"}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -65,7 +140,6 @@ function ProfileForm() {
   const [form, setForm] = useState({
     full_name: "",
     designation: "",
-    department: "",
     phone: "",
     joining_date: "",
     availability: "available" as Availability,
@@ -76,7 +150,6 @@ function ProfileForm() {
       setForm({
         full_name: me.profile.full_name ?? "",
         designation: me.profile.designation ?? "",
-        department: me.profile.department ?? "",
         phone: me.profile.phone ?? "",
         joining_date: me.profile.joining_date ?? "",
         availability: me.profile.availability ?? "available",
@@ -91,7 +164,6 @@ function ProfileForm() {
         data: {
           full_name: form.full_name || null,
           designation: form.designation || null,
-          department: form.department || null,
           phone: form.phone || null,
           joining_date: form.joining_date || null,
           availability: form.availability,
@@ -129,9 +201,12 @@ function ProfileForm() {
         </div>
         <div className="space-y-2">
           <Label>Department</Label>
+          {/* Department decides which projects and tasks you see, so only a super admin sets it. */}
           <Input
-            value={form.department}
-            onChange={(e) => setForm({ ...form, department: e.target.value })}
+            value={me?.profile?.department ?? "Not set"}
+            readOnly
+            disabled
+            title="Only a super admin can change your department"
           />
         </div>
         <div className="space-y-2">
@@ -172,211 +247,6 @@ function ProfileForm() {
         >
           <Save className="h-4 w-4 mr-2" /> Save changes
         </Button>
-      </div>
-    </Card>
-  );
-}
-
-function AddUserForm({ canPromoteSuper }: { canPromoteSuper: boolean }) {
-  const qc = useQueryClient();
-  const create = useServerFn(createUser);
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-    full_name: "",
-    designation: "",
-    department: "",
-    role: "Developer" as AppRole,
-  });
-
-  const m = useMutation({
-    mutationFn: async () => create({ data: form }),
-    onSuccess: () => {
-      toast.success("User created. Share the credentials with them.");
-      setForm({
-        email: "",
-        password: "",
-        full_name: "",
-        designation: "",
-        department: "",
-        role: "Developer" as AppRole,
-      });
-      qc.invalidateQueries({ queryKey: ["all-members-roles"] });
-      qc.invalidateQueries({ queryKey: ["team-members"] });
-    },
-    onError: (e: Error) => toast.error(e.message ?? "Failed to create user"),
-  });
-
-  const allowed = canPromoteSuper ? ROLES : ROLES.filter((r) => r !== "Super_Admin");
-
-  return (
-    <Card className="p-4 sm:p-6">
-      <h2 className="font-semibold mb-4 flex items-center gap-2">
-        <UserPlus className="h-4 w-4" /> Add Team Member
-      </h2>
-      <div className="grid sm:grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>Full name *</Label>
-          <Input
-            value={form.full_name}
-            onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Email *</Label>
-          <Input
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Temporary password *</Label>
-          <Input
-            type="text"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder="min 6 chars"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Role</Label>
-          <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as AppRole })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {allowed.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {r}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Designation</Label>
-          <Input
-            value={form.designation}
-            onChange={(e) => setForm({ ...form, designation: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Department</Label>
-          <Input
-            value={form.department}
-            onChange={(e) => setForm({ ...form, department: e.target.value })}
-          />
-        </div>
-      </div>
-      <div className="flex justify-end mt-4">
-        <Button
-          className="w-full sm:w-auto"
-          onClick={() => m.mutate()}
-          disabled={
-            m.isPending ||
-            !form.email ||
-            !form.password ||
-            !form.full_name ||
-            form.password.length < 6
-          }
-        >
-          <UserPlus className="h-4 w-4 mr-2" /> Create user
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-function RoleManager() {
-  const qc = useQueryClient();
-
-  const { data: members = [], isLoading } = useQuery<
-    Array<{
-      id: string;
-      full_name?: string | null;
-      designation?: string | null;
-      roles: Array<{ id: string; role: string }>;
-    }>
-  >({
-    queryKey: ["all-members-roles"],
-    queryFn: async () =>
-      (await listRoleMembers()) as Array<{
-        id: string;
-        full_name?: string | null;
-        designation?: string | null;
-        roles: Array<{ id: string; role: string }>;
-      }>,
-  });
-
-  const addRole = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      await addRoleFn({ data: { userId, role } });
-    },
-    onSuccess: () => {
-      toast.success("Role assigned");
-      qc.invalidateQueries({ queryKey: ["all-members-roles"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const removeRole = useMutation({
-    mutationFn: async (id: string) => {
-      await removeRoleFn({ data: { id } });
-    },
-    onSuccess: () => {
-      toast.success("Role removed");
-      qc.invalidateQueries({ queryKey: ["all-members-roles"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <Card className="p-4 sm:p-6">
-      <h2 className="font-semibold mb-4 flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4" /> Role Management
-      </h2>
-      <div className="space-y-3">
-        {isLoading && <ListRowsSkeleton rows={3} />}
-        {members.map((m) => (
-          <div
-            key={m.id}
-            className="p-3 border border-border rounded-lg flex flex-wrap items-center gap-3"
-          >
-            <div className="flex-1 min-w-0">
-              <p className="font-medium break-words">{m.full_name ?? "—"}</p>
-              <p className="text-xs text-muted-foreground">{m.designation ?? ""}</p>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {m.roles.length === 0 && <Badge variant="secondary">developer</Badge>}
-              {m.roles.map((r) => (
-                <Badge key={r.id} variant="secondary" className="gap-1">
-                  {r.role}
-                  <button
-                    onClick={() => removeRole.mutate(r.id)}
-                    className="hover:text-destructive p-0.5 -m-0.5"
-                    title="Remove role"
-                    aria-label={`Remove ${r.role} role`}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-            <Select onValueChange={(v) => addRole.mutate({ userId: m.id, role: v as AppRole })}>
-              <SelectTrigger className="w-full sm:w-40 h-8">
-                <SelectValue placeholder="Assign role" />
-              </SelectTrigger>
-              <SelectContent>
-                {ROLES.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ))}
       </div>
     </Card>
   );

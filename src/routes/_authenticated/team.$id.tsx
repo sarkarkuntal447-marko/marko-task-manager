@@ -16,10 +16,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DEPARTMENTS, type Department } from "@/lib/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Briefcase, Calendar, Crown, Pencil, Wrench } from "lucide-react";
-import { statusLabel, statusColor, priorityColor, availabilityLabel, fmtDate } from "@/lib/format";
+import { ArrowLeft, Briefcase, Calendar, Crown, Pencil } from "lucide-react";
+import {
+  statusLabel,
+  statusColor,
+  priorityColor,
+  availabilityLabel,
+  fmtDate,
+  todayStr,
+  priorityLabel,
+} from "@/lib/format";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { AvailabilityIcon } from "@/components/availability-status";
 import { MemberDetailSkeleton } from "@/components/skeletons";
 
 export const Route = createFileRoute("/_authenticated/team/$id")({
@@ -44,16 +61,10 @@ function MemberDetail() {
   if (isLoading) return <MemberDetailSkeleton />;
   if (!member) return <div className="p-8 text-muted-foreground">Member not found.</div>;
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todaysTasks = tasks.filter(
-    (t) => (t.created_at ?? "").slice(0, 10) === today || t.due_date === today,
-  );
-  const previousTasks = tasks.filter((t) => !todaysTasks.includes(t));
+  const today = todayStr();
+  const todaysTasks = tasks.filter((t) => t.task_date === today);
 
-  const working = projects.filter(
-    (p) => memberships.includes(p.id) || p.lead_id === id || p.maintainer_id === id,
-  );
-  const maintains = projects.filter((p) => p.maintainer_id === id);
+  const working = projects.filter((p) => memberships.includes(p.id) || p.lead_id === id);
   const ownsAsSto = projects.filter((p) => p.lead_id === id);
 
   const display = member.full_name ?? "Team member";
@@ -94,7 +105,10 @@ function MemberDetail() {
                   <Calendar className="h-3 w-3" /> joined {fmtDate(member.joining_date)}
                 </span>
               )}
-              <Badge variant="secondary">{availabilityLabel(member.availability)}</Badge>
+              <Badge variant="secondary" className="gap-1.5">
+                <AvailabilityIcon value={member.availability} className="h-3.5 w-3.5" />
+                {availabilityLabel(member.availability)}
+              </Badge>
             </div>
             {!isStaff && (
               <p className="text-xs text-muted-foreground mt-2 italic">
@@ -110,7 +124,8 @@ function MemberDetail() {
         </div>
       </Card>
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      {/* Tasks are private to the member and the admins of their department. */}
+      {detail?.canSeeTasks && (
         <Card className="p-4 sm:p-6 border-primary/40 bg-primary/[0.04]">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h2 className="font-semibold">Today's Tasks · {fmtDate(today)}</h2>
@@ -126,35 +141,13 @@ function MemberDetail() {
             </div>
           )}
         </Card>
+      )}
 
-        <Card className="p-4 sm:p-6">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className="font-semibold">Previous Tasks</h2>
-            <Badge variant="secondary">{previousTasks.length}</Badge>
-          </div>
-          {previousTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No prior tasks.</p>
-          ) : (
-            <div className="space-y-2 max-h-96 overflow-auto overscroll-contain pr-1">
-              {previousTasks.map((t) => (
-                <TaskLine key={t.id} t={t} />
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
         <ProjectList
-          title="Currently working on"
+          title="Accessible Projects"
           icon={<Briefcase className="h-4 w-4" />}
           projects={working}
-          stoIds={ownsAsSto.map((p) => p.id)}
-        />
-        <ProjectList
-          title="Maintains"
-          icon={<Wrench className="h-4 w-4" />}
-          projects={maintains}
           stoIds={ownsAsSto.map((p) => p.id)}
         />
         <ProjectList
@@ -176,7 +169,10 @@ function EditMemberDialog({ member }: { member: Member }) {
   const initial = () => ({
     full_name: member.full_name ?? "",
     designation: member.designation ?? "",
-    department: member.department ?? "",
+    // Older free-text departments that aren't in the list start out unselected.
+    department: (DEPARTMENTS as readonly string[]).includes(member.department ?? "")
+      ? (member.department as Department)
+      : ("" as Department | ""),
     phone: member.phone ?? "",
   });
   const [form, setForm] = useState(initial);
@@ -190,7 +186,7 @@ function EditMemberDialog({ member }: { member: Member }) {
           changes: {
             full_name: form.full_name.trim(),
             designation: form.designation.trim() || null,
-            department: form.department.trim() || null,
+            department: form.department || null,
             phone: form.phone.trim() || null,
           },
         },
@@ -239,7 +235,10 @@ function EditMemberDialog({ member }: { member: Member }) {
           </div>
           <div className="space-y-2">
             <Label>Department</Label>
-            <Input value={form.department} onChange={(e) => update("department", e.target.value)} />
+            <Input
+              value={form.department}
+              onChange={(e) => update("department", e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>Phone</Label>
@@ -264,14 +263,13 @@ function TaskLine({
   return (
     <div className="p-3 rounded-lg border border-border flex flex-wrap items-center gap-2 sm:gap-3">
       <div className="flex-1 min-w-[10rem]">
-        <p className="font-medium text-sm break-words">{t.name}</p>
+        <p className="font-medium text-sm whitespace-pre-wrap break-words">{t.name}</p>
         <p className="text-xs text-muted-foreground">
-          {t.projects?.name ?? "—"}
-          {t.due_date && ` · due ${fmtDate(t.due_date)}`}
+          {fmtDate(t.task_date)} · {t.project_name ?? "—"}
         </p>
       </div>
       <Badge variant="secondary" className={priorityColor(t.priority)}>
-        {t.priority}
+        {priorityLabel(t.priority)}
       </Badge>
       <Badge variant="secondary" className={statusColor(t.status)}>
         {statusLabel(t.status)}

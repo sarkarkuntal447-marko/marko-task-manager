@@ -266,19 +266,16 @@ export function PhaseDetailSkeleton() {
   return (
     <div className="space-y-4 sm:space-y-6 max-w-3xl mx-auto">
       <Skeleton className="h-4 w-40" />
-      <Card className="p-4 sm:p-6 space-y-4">
-        <div className="flex items-start gap-3">
-          <Skeleton className="h-4 w-4 mt-1.5 shrink-0" />
-          <div className="flex-1 min-w-0 space-y-2">
-            <Skeleton className="h-6 w-56 max-w-full" />
-            <Skeleton className="h-3 w-40 max-w-full" />
-          </div>
+      <Card className="p-4 sm:p-6 space-y-5">
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-40 max-w-full" />
+          <Skeleton className="h-6 w-56 max-w-full" />
         </div>
-        <Skeleton className="h-2 w-full" />
-      </Card>
-      <Card className="p-4 sm:p-6">
-        <Skeleton className="h-5 w-32 mb-4" />
-        <ListRowsSkeleton rows={4} />
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <Skeleton className="h-12 w-full" />
       </Card>
     </div>
   );

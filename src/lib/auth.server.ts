@@ -35,14 +35,13 @@ export async function verifyPassword(password: string, stored: string) {
 
 export function signSession(userId: string) {
   const head = b64(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = b64(
-    JSON.stringify({ sub: userId, exp: Math.floor(Date.now() / 1000) + SESSION_SECONDS }),
-  );
+  const iat = Math.floor(Date.now() / 1000);
+  const body = b64(JSON.stringify({ sub: userId, iat, exp: iat + SESSION_SECONDS }));
   const sig = createHmac("sha256", secret()).update(`${head}.${body}`).digest("base64url");
   return `${head}.${body}.${sig}`;
 }
 
-function verifySession(token: string): string | null {
+function verifySession(token: string): { id: string; iat: number } | null {
   const [head, body, sig] = token.split(".");
   if (!head || !body || !sig) return null;
   const expected = createHmac("sha256", secret()).update(`${head}.${body}`).digest();
@@ -56,7 +55,8 @@ function verifySession(token: string): string | null {
       payload.exp < Date.now() / 1000
     )
       return null;
-    return payload.sub;
+    // Sessions from before `iat` existed count as issued at 0.
+    return { id: payload.sub, iat: typeof payload.iat === "number" ? payload.iat : 0 };
   } catch {
     return null;
   }
@@ -85,10 +85,15 @@ export function setSessionCookie(token: string | null) {
 export async function currentUserId(): Promise<string | null> {
   const request = getRequest();
   const token = readCookie(request?.headers.get("cookie") ?? null, SESSION_COOKIE);
-  const id = token ? verifySession(token) : null;
-  if (!id) return null;
+  const session = token ? verifySession(token) : null;
+  if (!session) return null;
   const db = await getDb();
-  return (await db.collection<UserDoc>("users").findOne({ id }, { projection: { id: 1 } }))
-    ? id
-    : null;
+  const user = await db
+    .collection<UserDoc>("users")
+    .findOne({ id: session.id }, { projection: { id: 1, active: 1, password_changed_at: 1 } });
+  // Disabled accounts lose their session immediately, and so does every
+  // session signed before the last password change.
+  if (!user || user.active === false) return null;
+  if (user.password_changed_at && session.iat < user.password_changed_at) return null;
+  return session.id;
 }

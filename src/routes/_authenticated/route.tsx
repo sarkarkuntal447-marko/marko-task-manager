@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
     const me = await getSession();
     if (!me) throw redirect({ to: "/auth" });
-    return { user: me.user };
+    return { user: me.user, role: me.role };
   },
   // Show the skeleton shell almost immediately while the session is checked, instead of a blank screen.
   pendingComponent: AppShellSkeleton,

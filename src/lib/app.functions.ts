@@ -1,12 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAuth } from "./auth-middleware";
+import { AVAILABILITY, DEPARTMENTS, PRIORITIES, TASK_STATUSES } from "./types";
 
 const id = z.string().trim().min(1).max(100);
 const text = z.string().trim().max(10000);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const priority = z.enum(["low", "medium", "high", "critical"]);
-const taskStatus = z.enum(["pending", "in_progress", "blocked", "testing", "completed"]);
+const priority = z.enum(PRIORITIES);
+const taskStatus = z.enum(TASK_STATUSES);
 const role = z.enum(["Developer", "SEO", "Admin", "Super_Admin"]);
 const srv = () => import("./app.server");
 
@@ -19,6 +20,22 @@ export const login = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => (await srv()).login(data.email, data.password));
+
+// Only ever the caller's own password (the id comes from the session).
+export const changeMyPassword = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .validator((d: unknown) =>
+    z
+      .object({
+        current_password: z.string().min(1).max(200),
+        new_password: z.string().min(6).max(200),
+      })
+      .strict()
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    (await srv()).changeMyPassword(context, data.current_password, data.new_password),
+  );
 
 export const logout = createServerFn({ method: "POST" }).handler(async () =>
   (await srv()).logout(),
@@ -41,7 +58,7 @@ export const createUser = createServerFn({ method: "POST" })
         full_name: z.string().trim().min(1).max(200),
         role: role.default("Developer"),
         designation: z.string().trim().max(200).optional(),
-        department: z.string().trim().max(200).optional(),
+        department: z.enum(DEPARTMENTS).optional(),
       })
       .parse(d),
   )
@@ -55,15 +72,28 @@ export const updateMyProfile = createServerFn({ method: "POST" })
       .object({
         full_name: text.max(200).nullable(),
         designation: text.max(200).nullable(),
-        department: text.max(200).nullable(),
+        // No department: it decides what you can see, so only a super admin changes it.
         phone: text.max(50).nullable(),
         joining_date: date.nullable(),
-        availability: z.enum(["available", "busy", "on_leave"]),
+        availability: z.enum(AVAILABILITY),
       })
       .strict()
       .parse(d),
   )
   .handler(async ({ data, context }) => (await srv()).updateMyProfile(context, data));
+
+// Quick status switch from the header menu (changes only availability).
+export const setMyAvailability = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .validator((d: unknown) =>
+    z
+      .object({ availability: z.enum(AVAILABILITY) })
+      .strict()
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    (await srv()).updateMyProfile(context, { availability: data.availability }),
+  );
 
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([requireAuth])
@@ -94,7 +124,7 @@ export const updateMemberProfile = createServerFn({ method: "POST" })
           .object({
             full_name: text.min(1).max(200),
             designation: text.max(200).nullable(),
-            department: text.max(200).nullable(),
+            department: z.enum(DEPARTMENTS).nullable(),
             phone: text.max(50).nullable(),
           })
           .strict(),
@@ -110,27 +140,37 @@ export const getDashboard = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => (await srv()).getDashboard(context));
 
-// ---- tasks ----
-export const listAllTasks = createServerFn({ method: "GET" })
+// ---- tasks (each person's daily work log) ----
+const taskFields = z
+  .object({
+    task_date: date,
+    project_id: id,
+    name: text.min(1),
+    priority,
+    status: taskStatus,
+    start_date: date.nullable(),
+    end_date: date.nullable(),
+    notes: text.nullable(),
+  })
+  .strict();
+
+export const listMyTasks = createServerFn({ method: "GET" })
   .middleware([requireAuth])
-  .handler(async () => (await srv()).listAllTasks());
+  .handler(async ({ context }) => (await srv()).listMyTasks(context));
+
+// Admins and super admins: tasks of the people in their department.
+export const listTeamTasks = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => (await srv()).listTeamTasks(context));
+
+// Projects the current user may log tasks against.
+export const listTaskProjects = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => (await srv()).listTaskProjects(context));
 
 export const createTask = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .validator((d: unknown) =>
-    z
-      .object({
-        name: z.string().trim().min(1).max(200),
-        description: text.nullable().optional(),
-        project_id: id.nullable().optional(),
-        phase_id: id.nullable().optional(),
-        priority: priority.optional(),
-        status: taskStatus.optional(),
-        due_date: date.nullable().optional(),
-      })
-      .strict()
-      .parse(d),
-  )
+  .validator((d: unknown) => taskFields.parse(d))
   .handler(async ({ data, context }) => (await srv()).createTask(context, data));
 
 export const updateTask = createServerFn({ method: "POST" })
@@ -139,16 +179,8 @@ export const updateTask = createServerFn({ method: "POST" })
     z
       .object({
         id,
-        changes: z
-          .object({
-            name: z.string().trim().min(1).max(200),
-            description: text.nullable(),
-            priority,
-            status: taskStatus,
-            due_date: date.nullable(),
-          })
+        changes: taskFields
           .partial()
-          .strict()
           .refine((v) => Object.keys(v).length > 0, "No changes supplied"),
       })
       .strict()
@@ -162,7 +194,8 @@ export const deleteTask = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => (await srv()).deleteTask(context, data.id));
 
 // ---- logs / activity ----
-export const listActivity = createServerFn({ method: "GET" })
+// Full workspace activity history for the Application Logs page (Admin / Super Admin only).
+export const listApplicationLogs = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .validator((d: unknown) =>
     z
@@ -173,47 +206,23 @@ export const listActivity = createServerFn({ method: "GET" })
       .strict()
       .parse(d),
   )
-  .handler(async ({ data }) => (await srv()).listActivity(data));
+  .handler(async ({ data, context }) => (await srv()).listApplicationLogs(context, data));
 
-export const listDailyLogs = createServerFn({ method: "GET" })
+// ---- member management (Admin / Super Admin) ----
+export const listMembers = createServerFn({ method: "GET" })
   .middleware([requireAuth])
-  .validator((d: unknown) =>
-    z
-      .object({ dates: z.array(date).max(10).optional() })
-      .strict()
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => (await srv()).listDailyLogs(context, data));
+  .handler(async ({ context }) => (await srv()).listMembers(context));
 
-export const createDailyLog = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .validator((d: unknown) =>
-    z
-      .object({
-        log_date: date,
-        task_name: z.string().trim().min(1).max(200),
-        project_id: id.nullable().optional(),
-        priority: priority.optional(),
-        status: taskStatus.optional(),
-        hours: z.number().min(0).max(1000).nullable().optional(),
-        notes: text.nullable().optional(),
-      })
-      .strict()
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => (await srv()).createDailyLog(context, data));
-
-// ---- roles ----
-export const listRoleMembers = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
-  .handler(async ({ context }) => (await srv()).listRoleMembers(context));
-
-export const addRole = createServerFn({ method: "POST" })
+export const setMemberRole = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .validator((d: unknown) => z.object({ userId: id, role }).strict().parse(d))
-  .handler(async ({ data, context }) => (await srv()).addRole(context, data.userId, data.role));
+  .handler(async ({ data, context }) =>
+    (await srv()).setMemberRole(context, data.userId, data.role),
+  );
 
-export const removeRole = createServerFn({ method: "POST" })
+export const setMemberActive = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .validator((d: unknown) => z.object({ id }).strict().parse(d))
-  .handler(async ({ data, context }) => (await srv()).removeRole(context, data.id));
+  .validator((d: unknown) => z.object({ userId: id, active: z.boolean() }).strict().parse(d))
+  .handler(async ({ data, context }) =>
+    (await srv()).setMemberActive(context, data.userId, data.active),
+  );
