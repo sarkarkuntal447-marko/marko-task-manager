@@ -16,6 +16,7 @@ import {
   Activity as ActivityIcon,
   FolderPlus,
   UserPlus,
+  KeyRound,
   UserMinus,
   CheckCircle2,
   ListTodo,
@@ -255,6 +256,15 @@ function describeActivity(a: ActivityEntry): { icon: ReactNode; text: ReactNode 
         text: (
           <>
             <b>{a.entity_name}</b> joined the workspace
+          </>
+        ),
+      };
+    case "member.password_changed":
+      return {
+        icon: <KeyRound className="h-4 w-4" />,
+        text: (
+          <>
+            <b>{who}</b> changed their password
           </>
         ),
       };

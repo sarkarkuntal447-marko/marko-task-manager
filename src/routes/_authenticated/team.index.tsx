@@ -128,9 +128,12 @@ function AccountStatus({ active }: { active: boolean }) {
       )}
     >
       <span className="relative flex h-2 w-2">
-        {active && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-60" />
-        )}
+        <span
+          className={cn(
+            "absolute inline-flex h-full w-full animate-ping rounded-full opacity-60",
+            active ? "bg-green-500" : "bg-red-500",
+          )}
+        />
         <span
           className={cn(
             "relative inline-flex h-2 w-2 rounded-full",

@@ -21,6 +21,8 @@ export interface UserDoc {
   password_hash: string;
   /** false = disabled by an admin (cannot sign in). Missing means active. */
   active?: boolean;
+  /** Unix seconds of the last password change; sessions signed before it are rejected. */
+  password_changed_at?: number;
   created_at: string;
 }
 export interface ProfileDoc {
@@ -69,20 +71,10 @@ export interface ProjectDoc {
   /** Projects can no longer be archived; ones archived earlier stay hidden. */
   archived_at?: string | null;
 }
-export interface SubPhaseDoc {
-  id: string;
-  name: string;
-  completed: boolean;
-  created_at: string;
-  start_date?: string | null;
-  end_date?: string | null;
-}
 export interface PhaseDoc {
-  sub_phases?: SubPhaseDoc[];
   id: string;
   project_id: string;
   name: string;
-  assigned_to: string | null;
   start_date: string | null;
   end_date: string | null;
   status: PhaseStatus;

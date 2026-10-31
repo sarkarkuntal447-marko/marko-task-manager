@@ -1,8 +1,9 @@
 // Moves existing projects onto the Tech / SEO workflows:
 //  - every project without a type becomes a Tech project,
 //  - old statuses are mapped onto the nearest Tech stage,
-//  - the retired maintenance flag and maintainer fields are removed.
-// Phases are left as they are. Safe to run more than once.
+//  - the retired maintenance flag and maintainer fields are removed,
+//  - phases lose their assignee and sub-phases (phases are now just name, dates, status, notes).
+// Phase names, dates and status are left as they are. Safe to run more than once.
 // Usage: npm run db:migrate-project-types
 import { MongoClient } from "mongodb";
 
@@ -58,6 +59,15 @@ try {
     { $unset: { isMaintenable: "", maintainer_id: "" } },
   );
   console.log(`maintenance fields removed: ${cleaned.modifiedCount}`);
+
+  const unassigned = await client
+    .db(dbName)
+    .collection("project_phases")
+    .updateMany(
+      { $or: [{ assigned_to: { $exists: true } }, { sub_phases: { $exists: true } }] },
+      { $unset: { assigned_to: "", sub_phases: "" } },
+    );
+  console.log(`phase assignees and sub-phases removed: ${unassigned.modifiedCount}`);
 } catch (e) {
   console.error("Failed:", e?.message ?? e);
   process.exitCode = 1;

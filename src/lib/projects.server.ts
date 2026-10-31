@@ -2,14 +2,7 @@ import "@tanstack/react-start/server-only";
 import { randomUUID } from "node:crypto";
 import { ObjectId, type Db, type WithId } from "mongodb";
 import type { z } from "zod";
-import type {
-  SubPhaseDoc,
-  PhaseDoc,
-  ProfileDoc,
-  ProjectDoc,
-  ProjectMemberDoc,
-  TaskDoc,
-} from "./types";
+import type { PhaseDoc, ProfileDoc, ProjectDoc, ProjectMemberDoc, TaskDoc } from "./types";
 import { ONGOING_TASK_STATUSES } from "./types";
 import {
   PROJECT_STATUS_LABEL,
@@ -112,6 +105,24 @@ async function checkDepartments(db: Db, type: ProjectType, ids: Array<string | n
     );
 }
 
+/** Puts someone on the project's team ("Currently Working On"); does nothing if already there. */
+async function ensureMember(db: Db, projectId: string, userId: string) {
+  // A deterministic _id keeps repeated or concurrent adds to a single membership.
+  if (
+    await db
+      .collection<Member>("project_members")
+      .findOne({ project_id: projectId, user_id: userId })
+  )
+    return;
+  await db.collection<Member & { _id: string }>("project_members").updateOne(
+    { _id: `member:${projectId}:${userId}` },
+    {
+      $setOnInsert: { id: randomUUID(), project_id: projectId, user_id: userId, created_at: now() },
+    },
+    { upsert: true },
+  );
+}
+
 // Deterministic _ids make repeated or concurrent seeding idempotent.
 async function insertDefaultPhases(db: Db, projectId: string, type: ProjectType) {
   const timestamp = now();
@@ -127,7 +138,6 @@ async function insertDefaultPhases(db: Db, projectId: string, type: ProjectType)
             position,
             completed: false,
             status: "not_started" as const,
-            assigned_to: null,
             start_date: null,
             end_date: null,
             notes: null,
@@ -216,6 +226,8 @@ export async function createProject(context: Context, input: ProjectInput) {
       created_at: timestamp,
     });
   }
+  // The single-threaded owner is always on the team.
+  if (project.lead_id) await ensureMember(db, project.id, project.lead_id);
   await logActivity(context.userId, "project.created", "project", project.id, project.name);
   return { id: project.id };
 }
@@ -225,12 +237,16 @@ export async function updateProject(context: Context, id: string, changes: Proje
   const db = await getDb();
   const doc = await projectDoc(context, db, id);
   await requireAdminOrMember(context, db, id);
+  // Team members may edit the project, but only admins choose the single-threaded owner.
+  if (changes.lead_id !== undefined) await requireRole(context, ADMINS);
   const type = projectTypeOf(doc);
   checkStatus(type, changes.status);
   await checkDepartments(db, type, [changes.lead_id]);
   await db
     .collection<Project>("projects")
     .updateOne({ _id: doc._id, archived_at: null }, { $set: { ...changes, updated_at: now() } });
+  // The single-threaded owner is always on the team.
+  if (changes.lead_id) await ensureMember(db, id, changes.lead_id);
   return { id };
 }
 
@@ -247,7 +263,6 @@ export async function listProjectPhases(context: Context, projectId: string): Pr
 }
 
 export async function createProjectPhase(context: Context, projectId: string, input: PhaseInput) {
-  await checkUserIds([input.assigned_to]);
   const db = await getDb();
   await projectDoc(context, db, projectId);
   await requireAdminOrMember(context, db, projectId);
@@ -258,7 +273,6 @@ export async function createProjectPhase(context: Context, projectId: string, in
   const phase: Phase = {
     id: randomUUID(),
     project_id: projectId,
-    assigned_to: null,
     start_date: null,
     end_date: null,
     notes: null,
@@ -280,7 +294,6 @@ export async function updateProjectPhase(
   changes: Partial<PhaseInput>,
 ) {
   await requireRole(context);
-  await checkUserIds([changes.assigned_to]);
   const db = await getDb();
   await projectDoc(context, db, projectId);
   const phases = db.collection<Phase>("project_phases");
@@ -296,16 +309,6 @@ export async function updateProjectPhase(
       },
     },
   );
-  // Checking a parent checks all its sub-phases; un-checking a finished parent un-checks them.
-  if (changes.status && before.sub_phases?.length) {
-    const done = changes.status === "completed";
-    if (done || before.completed) {
-      await phases.updateOne(
-        { id: phaseId, project_id: projectId },
-        { $set: { "sub_phases.$[].completed": done } },
-      );
-    }
-  }
   return { id: phaseId };
 }
 
@@ -350,150 +353,28 @@ export async function listProjectMembers(context: Context, projectId: string): P
   ).map(plain);
 }
 
+// Admins and the project's own team members manage "Currently Working On".
 export async function addProjectMember(context: Context, projectId: string, userId: string) {
-  await requireRole(context);
   await checkUserIds([userId]);
   const db = await getDb();
   const doc = await projectDoc(context, db, projectId);
+  await requireAdminOrMember(context, db, projectId);
   await checkDepartments(db, projectTypeOf(doc), [userId]);
-  if (
-    await db
-      .collection<Member>("project_members")
-      .findOne({ project_id: projectId, user_id: userId })
-  )
-    return { userId };
-  await db.collection<Member & { _id: string }>("project_members").updateOne(
-    { _id: `member:${projectId}:${userId}` },
-    {
-      $setOnInsert: { id: randomUUID(), project_id: projectId, user_id: userId, created_at: now() },
-    },
-    { upsert: true },
-  );
+  await ensureMember(db, projectId, userId);
   return { userId };
 }
 
 export async function removeProjectMember(context: Context, projectId: string, userId: string) {
-  await requireRole(context);
   const db = await getDb();
-  await projectDoc(context, db, projectId);
+  const doc = await projectDoc(context, db, projectId);
+  await requireAdminOrMember(context, db, projectId);
+  // The single-threaded owner stays on the team; change or clear the owner first.
+  if (doc.lead_id === userId)
+    throw new Error(
+      "The single-threaded owner can't be removed from the team. Change or clear the owner first.",
+    );
   await db
     .collection<Member>("project_members")
     .deleteMany({ project_id: projectId, user_id: userId });
   return { userId };
-}
-
-// ---------- sub-phases (stored inside the parent phase document) ----------
-// Keeps the parent in step with its children: all sub-phases done => parent done; otherwise not done.
-async function syncParent(db: Db, projectId: string, phaseId: string) {
-  const phases = db.collection<Phase>("project_phases");
-  const phase = await phases.findOne({ id: phaseId, project_id: projectId });
-  const subs = phase?.sub_phases ?? [];
-  if (!phase || !subs.length) return;
-  const all = subs.every((s) => s.completed);
-  if (all && !phase.completed) {
-    await phases.updateOne(
-      { id: phaseId },
-      { $set: { completed: true, status: "completed", updated_at: now() } },
-    );
-  } else if (!all && phase.completed) {
-    await phases.updateOne(
-      { id: phaseId },
-      { $set: { completed: false, status: "in_progress", updated_at: now() } },
-    );
-  }
-}
-
-function checkDateRange(start?: string | null, end?: string | null) {
-  // Dates are YYYY-MM-DD, so plain string comparison orders them correctly.
-  if (start && end && end < start) throw new Error("End date cannot be before the start date.");
-}
-
-export async function addSubPhases(
-  context: Context,
-  projectId: string,
-  phaseId: string,
-  names: string[],
-  dates: { start_date?: string | null; end_date?: string | null } = {},
-) {
-  await requireRole(context);
-  const db = await getDb();
-  await projectDoc(context, db, projectId);
-  checkDateRange(dates.start_date, dates.end_date);
-  const timestamp = now();
-  const items: SubPhaseDoc[] = names.map((name) => ({
-    id: randomUUID(),
-    name,
-    completed: false,
-    created_at: timestamp,
-    start_date: dates.start_date ?? null,
-    end_date: dates.end_date ?? null,
-  }));
-  const result = await db
-    .collection<Phase>("project_phases")
-    .updateOne(
-      { id: phaseId, project_id: projectId },
-      { $push: { sub_phases: { $each: items } }, $set: { updated_at: timestamp } },
-    );
-  if (!result.matchedCount) throw new Error("Phase not found.");
-  await syncParent(db, projectId, phaseId);
-  return { count: items.length };
-}
-
-export async function updateSubPhase(
-  context: Context,
-  projectId: string,
-  phaseId: string,
-  subId: string,
-  changes: {
-    name?: string;
-    completed?: boolean;
-    start_date?: string | null;
-    end_date?: string | null;
-  },
-) {
-  await requireRole(context);
-  const db = await getDb();
-  await projectDoc(context, db, projectId);
-  if (changes.start_date !== undefined || changes.end_date !== undefined) {
-    const phase = await db
-      .collection<Phase>("project_phases")
-      .findOne({ id: phaseId, project_id: projectId });
-    const sub = phase?.sub_phases?.find((s) => s.id === subId);
-    if (!sub) throw new Error("Sub-phase not found.");
-    checkDateRange(
-      changes.start_date !== undefined ? changes.start_date : sub.start_date,
-      changes.end_date !== undefined ? changes.end_date : sub.end_date,
-    );
-  }
-  const set: Record<string, unknown> = { updated_at: now() };
-  if (changes.name !== undefined) set["sub_phases.$.name"] = changes.name;
-  if (changes.completed !== undefined) set["sub_phases.$.completed"] = changes.completed;
-  if (changes.start_date !== undefined) set["sub_phases.$.start_date"] = changes.start_date;
-  if (changes.end_date !== undefined) set["sub_phases.$.end_date"] = changes.end_date;
-  const result = await db
-    .collection<Phase>("project_phases")
-    .updateOne({ id: phaseId, project_id: projectId, "sub_phases.id": subId }, { $set: set });
-  if (!result.matchedCount) throw new Error("Sub-phase not found.");
-  await syncParent(db, projectId, phaseId);
-  return { id: subId };
-}
-
-export async function deleteSubPhase(
-  context: Context,
-  projectId: string,
-  phaseId: string,
-  subId: string,
-) {
-  await requireRole(context);
-  const db = await getDb();
-  await projectDoc(context, db, projectId);
-  const result = await db
-    .collection<Phase>("project_phases")
-    .updateOne(
-      { id: phaseId, project_id: projectId },
-      { $pull: { sub_phases: { id: subId } }, $set: { updated_at: now() } },
-    );
-  if (!result.matchedCount) throw new Error("Phase not found.");
-  await syncParent(db, projectId, phaseId);
-  return { id: subId };
 }

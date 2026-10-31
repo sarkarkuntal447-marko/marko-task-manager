@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DatePicker } from "@/components/ui/date-picker";
-import { statusLabel, todayStr } from "@/lib/format";
+import { statusLabel, todayStr, priorityLabel } from "@/lib/format";
 import {
   PRIORITIES,
   TASK_STATUSES,
@@ -94,8 +94,10 @@ export function TaskFormDialog({
         end_date: form.end_date || null,
         notes: form.notes.trim() || null,
       };
-      if (task) await updateTask({ data: { id: task.id, changes: data } });
-      else await createTask({ data });
+      if (task) {
+        const { task_date: _date, ...changes } = data;
+        await updateTask({ data: { id: task.id, changes } });
+      } else await createTask({ data });
     },
     onSuccess: () => {
       toast.success(task ? "Task updated" : "Task added");
@@ -120,7 +122,8 @@ export function TaskFormDialog({
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Date *</Label>
-            <DatePicker value={form.task_date} onChange={(v) => set("task_date", v)} />
+            {/* Tasks are logged for today; the date can't be changed. */}
+            <DatePicker value={form.task_date} onChange={() => {}} disabled />
           </div>
           <div className="space-y-2">
             <Label>Project *</Label>
@@ -166,7 +169,7 @@ export function TaskFormDialog({
               <SelectContent>
                 {PRIORITIES.map((p) => (
                   <SelectItem key={p} value={p}>
-                    {statusLabel(p)}
+                    {priorityLabel(p)}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -14,6 +14,7 @@ import {
   PauseCircle,
   ChevronRight,
   ArrowRight,
+  Crown,
 } from "lucide-react";
 import {
   PieChart,
@@ -28,25 +29,19 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { statusLabel, statusColor, fmtDate } from "@/lib/format";
-import { isActive, isDelivered } from "@/lib/project-status";
+import {
+  statusLabel,
+  statusColor,
+  fmtDate,
+  availabilityLabel,
+  priorityLabel,
+  projectTypeColor,
+} from "@/lib/format";
+import { PROJECT_TYPE_LABEL, isActive, isDelivered } from "@/lib/project-status";
+import { PRIORITIES } from "@/lib/types";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AvailabilityIcon, WithStatus } from "@/components/availability-status";
 import { MetricCardSkeleton, ChartCardSkeleton, ListRowsSkeleton } from "@/components/skeletons";
-
-type DashboardProject = {
-  id: string;
-  name: string;
-  expected_delivery_date?: string | null;
-  progress: number;
-  status: string;
-};
-type DashboardTask = { status: string; priority: string };
-type DashboardProfile = { availability?: string | null };
-type DashboardData = {
-  projects: DashboardProject[];
-  tasks: DashboardTask[];
-  profiles: DashboardProfile[];
-  recent: DashboardProject[];
-};
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Marko Projects" }] }),
@@ -54,34 +49,36 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function DashboardPage() {
-  const { data, isLoading } = useQuery<DashboardData>({
+  const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
-    queryFn: async () => {
-      const d = (await getDashboard()) as Omit<DashboardData, "recent">;
-      return { ...d, recent: d.projects.slice(0, 6) };
-    },
+    queryFn: () => getDashboard(),
   });
 
+  const isAdmin = !!data?.isAdmin;
   const projects = data?.projects ?? [];
+  const scopeProjects = data?.scopeProjects ?? [];
   const tasks = data?.tasks ?? [];
-  const profiles = data?.profiles ?? [];
+  const scopeTasks = data?.scopeTasks ?? [];
+  const team = data?.team ?? [];
+  const recent = projects.slice(0, 6);
 
+  // Department-wide project counts (admins and super admins only).
   const total = projects.length;
   const active = projects.filter((p) => isActive(p.status)).length;
   const completed = projects.filter((p) => isDelivered(p.status)).length;
   const onHold = projects.filter((p) => p.status === "on_hold").length;
-  const delayed = projects.filter((p) => p.progress < 100 && isActive(p.status)).length;
+  // Admins: delays across the department; everyone else: delays on their own projects.
+  const delayed = scopeProjects.filter((p) => p.progress < 100 && isActive(p.status)).length;
 
   const pendingTasks = tasks.filter((t) => t.status !== "completed").length;
   const completedTasks = tasks.filter((t) => t.status === "completed").length;
 
-  const employees = profiles.length;
   // Everyone who is working today, whether in the office or from home.
-  const activeEmployees = profiles.filter((p) =>
+  const workingToday = team.filter((p) =>
     ["available", "busy", "focus", "wfh"].includes(p.availability ?? ""),
   ).length;
 
-  const statusCounts = projects.reduce<Record<string, number>>((a, p) => {
+  const statusCounts = scopeProjects.reduce<Record<string, number>>((a, p) => {
     a[p.status] = (a[p.status] ?? 0) + 1;
     return a;
   }, {});
@@ -98,60 +95,65 @@ function DashboardPage() {
     "hsl(320 50% 55%)",
   ];
 
-  const taskByPriority = ["low", "medium", "high", "critical"].map((p) => ({
-    priority: p[0].toUpperCase() + p.slice(1),
-    Pending: tasks.filter((t) => t.priority === p && t.status !== "completed").length,
-    Completed: tasks.filter((t) => t.priority === p && t.status === "completed").length,
+  const taskByPriority = [...PRIORITIES].reverse().map((p) => ({
+    priority: priorityLabel(p),
+    Pending: scopeTasks.filter((t) => t.priority === p && t.status !== "completed").length,
+    Completed: scopeTasks.filter((t) => t.priority === p && t.status === "completed").length,
   }));
+  const chartScope = isAdmin ? "All projects in your department" : "Projects you work on";
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
         <p className="text-sm sm:text-base text-muted-foreground">
-          Live snapshot of every project, person, and deadline. Click any card to navigate.
+          Your team, your projects and your work at a glance. Click any card to navigate.
         </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {isLoading ? (
-          Array.from({ length: 8 }).map((_, i) => <MetricCardSkeleton key={i} />)
+          Array.from({ length: 4 }).map((_, i) => <MetricCardSkeleton key={i} />)
         ) : (
           <>
-            <Metric
-              icon={FolderKanban}
-              label="Total Projects"
-              value={total}
-              tone="primary"
-              to="/projects"
-            />
-            <Metric
-              icon={TrendingUp}
-              label="Active Project"
-              value={active}
-              tone="info"
-              to="/projects"
-              search={{ status: "active" }}
-            />
-            <Metric
-              icon={CheckCircle2}
-              label="Completed Project"
-              value={completed}
-              tone="success"
-              to="/projects"
-              search={{ status: "delivered" }}
-            />
-            <Metric
-              icon={PauseCircle}
-              label="On Hold Projects"
-              value={onHold}
-              tone="muted"
-              to="/projects"
-              search={{ status: "on_hold" }}
-            />
+            {isAdmin && (
+              <>
+                <Metric
+                  icon={FolderKanban}
+                  label="Total Projects"
+                  value={total}
+                  tone="primary"
+                  to="/projects"
+                />
+                <Metric
+                  icon={TrendingUp}
+                  label="Active Project"
+                  value={active}
+                  tone="info"
+                  to="/projects"
+                  search={{ status: "active" }}
+                />
+                <Metric
+                  icon={CheckCircle2}
+                  label="Completed Project"
+                  value={completed}
+                  tone="success"
+                  to="/projects"
+                  search={{ status: "delivered" }}
+                />
+                <Metric
+                  icon={PauseCircle}
+                  label="On Hold Projects"
+                  value={onHold}
+                  tone="muted"
+                  to="/projects"
+                  search={{ status: "on_hold" }}
+                />
+              </>
+            )}
             <Metric
               icon={AlertTriangle}
-              label="Delayed"
+              label={isAdmin ? "Delayed" : "Delayed (my projects)"}
               value={delayed}
               tone="warning"
               to="/projects"
@@ -160,8 +162,8 @@ function DashboardPage() {
             <Metric
               icon={Users}
               label="Employees"
-              value={employees}
-              sub={`${activeEmployees} active`}
+              value={team.length}
+              sub={`${workingToday} working today`}
               tone="primary"
               to="/team"
             />
@@ -183,6 +185,11 @@ function DashboardPage() {
         )}
       </div>
 
+      <div className="grid lg:grid-cols-2 gap-3 sm:gap-4">
+        <TeamStatus team={team} loading={isLoading} />
+        <AccessibleProjects projects={data?.myProjects ?? []} loading={isLoading} />
+      </div>
+
       <div className="grid lg:grid-cols-3 gap-3 sm:gap-4">
         {isLoading ? (
           <>
@@ -193,7 +200,10 @@ function DashboardPage() {
           <>
             <Card className="p-4 sm:p-6 lg:col-span-1">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Project Status</h3>
+                <div>
+                  <h3 className="font-semibold">Project Status</h3>
+                  <p className="text-xs text-muted-foreground">{chartScope}</p>
+                </div>
                 <Link
                   to="/projects"
                   className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
@@ -228,7 +238,10 @@ function DashboardPage() {
 
             <Card className="p-4 sm:p-6 lg:col-span-2">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Tasks by Priority</h3>
+                <div>
+                  <h3 className="font-semibold">Tasks by Priority</h3>
+                  <p className="text-xs text-muted-foreground">{chartScope}</p>
+                </div>
                 <Link
                   to="/tasks"
                   className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
@@ -279,13 +292,13 @@ function DashboardPage() {
         </div>
         {isLoading ? (
           <ListRowsSkeleton rows={4} />
-        ) : data?.recent.length === 0 ? (
+        ) : recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No projects yet. Create one from the Projects page.
           </p>
         ) : (
           <div className="divide-y divide-border">
-            {data?.recent.map((p) => (
+            {recent.map((p) => (
               <Link
                 key={p.id}
                 to="/projects/$id"
@@ -300,15 +313,18 @@ function DashboardPage() {
                     Due {fmtDate(p.expected_delivery_date)}
                   </p>
                 </div>
-                <div className="w-24 sm:w-32 hidden sm:block shrink-0">
+                {/* Fixed-width columns keep every row's progress bar and status lined up. */}
+                <div className="w-40 hidden sm:block shrink-0">
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div className="h-full bg-primary" style={{ width: `${p.progress}%` }} />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{p.progress}%</p>
                 </div>
-                <Badge variant="secondary" className={`${statusColor(p.status)} shrink-0`}>
-                  {statusLabel(p.status)}
-                </Badge>
+                <div className="sm:w-64 shrink-0 flex">
+                  <Badge variant="secondary" className={statusColor(p.status)}>
+                    {statusLabel(p.status)}
+                  </Badge>
+                </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
               </Link>
             ))}
@@ -389,3 +405,120 @@ function EmptyChart({ label }: { label: string }) {
     </div>
   );
 }
+
+type TeamMember = Awaited<ReturnType<typeof getDashboard>>["team"][number];
+type MyProject = Awaited<ReturnType<typeof getDashboard>>["myProjects"][number];
+
+/** Active members of your department(s) and what they're up to right now. */
+function TeamStatus({ team, loading }: { team: TeamMember[]; loading: boolean }) {
+  return (
+    <Card className="p-4 sm:p-6 flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold">Team Status</h3>
+        <Link
+          to="/team"
+          className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+        >
+          Team <ArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+      {loading ? (
+        <ListRowsSkeleton rows={4} />
+      ) : team.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No team members in your department yet.</p>
+      ) : (
+        <div className="space-y-1 max-h-72 overflow-auto overscroll-contain -mx-2 px-2">
+          {team.map((m) => (
+            <Link
+              key={m.id}
+              to="/team/$id"
+              params={{ id: m.id }}
+              className="flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-muted/60 transition-colors no-underline"
+            >
+              <WithStatus value={m.availability}>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
+                    {initialsOf(m.full_name ?? "U")}
+                  </AvatarFallback>
+                </Avatar>
+              </WithStatus>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{m.full_name ?? "Team member"}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {[m.designation, m.department].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              <Badge variant="secondary" className="gap-1.5 shrink-0">
+                <AvailabilityIcon value={m.availability} className="h-3.5 w-3.5" />
+                {availabilityLabel(m.availability) || "Available"}
+              </Badge>
+            </Link>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** Projects you're on the team of, or own as single-threaded owner (crown). */
+function AccessibleProjects({ projects, loading }: { projects: MyProject[]; loading: boolean }) {
+  return (
+    <Card className="p-4 sm:p-6 flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold">Accessible Projects</h3>
+        <Badge variant="secondary">{projects.length}</Badge>
+      </div>
+      {loading ? (
+        <ListRowsSkeleton rows={4} />
+      ) : projects.length === 0 ? (
+        <p className="text-sm text-muted-foreground">You are not on any project team yet.</p>
+      ) : (
+        <div className="space-y-1 max-h-72 overflow-auto overscroll-contain -mx-2 px-2">
+          {projects.map((p) => (
+            <Link
+              key={p.id}
+              to="/projects/$id"
+              params={{ id: p.id }}
+              className="flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-muted/60 transition-colors group no-underline"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate flex items-center gap-1.5 group-hover:text-primary transition-colors">
+                  {p.isOwner && (
+                    <Crown
+                      className="h-3.5 w-3.5 text-amber-500 shrink-0"
+                      aria-label="Single-threaded owner"
+                    />
+                  )}
+                  <span className="truncate">{p.name}</span>
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  Due {fmtDate(p.expected_delivery_date)}
+                </p>
+              </div>
+              {/* Fixed-width columns keep the badges lined up from row to row. */}
+              <div className="w-14 shrink-0 flex">
+                <Badge variant="outline" className={projectTypeColor(p.project_type)}>
+                  {PROJECT_TYPE_LABEL[p.project_type]}
+                </Badge>
+              </div>
+              <div className="hidden sm:flex sm:w-64 shrink-0">
+                <Badge variant="secondary" className={statusColor(p.status)}>
+                  {statusLabel(p.status)}
+                </Badge>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-foreground transition-colors shrink-0" />
+            </Link>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+const initialsOf = (name: string) =>
+  name
+    .split(" ")
+    .map((s) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();

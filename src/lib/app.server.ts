@@ -16,7 +16,7 @@ import {
   type Context,
 } from "./access.server";
 import { listProjects, projectTypeFilter, projectTypesFor } from "./projects.server";
-import { canSeeTasksOf } from "./project-status";
+import { canSeeTasksOf, inDepartments } from "./project-status";
 import type {
   AppRole,
   DailyLogDoc,
@@ -44,6 +44,37 @@ export async function login(emailInput: string, password: string) {
     throw new Error("Your account has been disabled. Please contact an admin.");
   setSessionCookie(signSession(user.id));
   return { id: user.id };
+}
+
+/**
+ * Changes the signed-in user's own password. The user id comes only from the
+ * session, never from the request, so nobody can change someone else's password.
+ */
+export async function changeMyPassword(
+  context: Context,
+  currentPassword: string,
+  newPassword: string,
+) {
+  const db = await getDb();
+  const users = db.collection<UserDoc>("users");
+  const user = await users.findOne({ id: context.userId });
+  if (!user || !(await verifyPassword(currentPassword, user.password_hash)))
+    throw new Error("Your current password is incorrect.");
+  if (await verifyPassword(newPassword, user.password_hash))
+    throw new Error("Choose a password different from your current one.");
+  await users.updateOne(
+    { id: user.id },
+    {
+      $set: {
+        password_hash: await hashPassword(newPassword),
+        password_changed_at: Math.floor(Date.now() / 1000),
+      },
+    },
+  );
+  // Other devices are signed out; this one gets a fresh session.
+  setSessionCookie(signSession(user.id));
+  await logActivity(user.id, "member.password_changed", "profile", user.id, user.email);
+  return { ok: true };
 }
 
 export function logout() {
@@ -223,17 +254,82 @@ export async function updateMemberProfile(
   return { id };
 }
 
+/**
+ * Dashboard data, scoped by role:
+ *  - everyone: their department's team, the projects they work on, their own tasks;
+ *  - admins: also every project and team task in their department(s);
+ *  - super admins: the same as admins, across both departments.
+ */
 export async function getDashboard(context: Context) {
   const db = await getDb();
-  const [projects, tasks, profiles] = await Promise.all([
+  const me = context.userId;
+  const [isAdmin, types, projects, memberships, people, disabled] = await Promise.all([
+    hasAnyRole(me, ADMINS),
+    projectTypesFor(context, db),
     listProjects(context),
+    db.collection<ProjectMemberDoc>("project_members").find({ user_id: me }).toArray(),
+    teamDirectory(context),
+    db
+      .collection<UserDoc>("users")
+      .find({ active: false }, { projection: { _id: 0, id: 1 } })
+      .toArray(),
+  ]);
+
+  const memberOf = new Set(memberships.map((m) => m.project_id));
+  const mine = projects.filter((p) => memberOf.has(p.id) || p.lead_id === me);
+  // Charts and "delayed": admins look at the whole department, everyone else at their own projects.
+  const scope = isAdmin ? projects : mine;
+
+  // Pending / completed counts: your own tasks, plus (admins) the tasks of the people you oversee.
+  const owners = [me, ...(isAdmin ? (await teamTaskOwners(context, db)).map((m) => m.id) : [])];
+  const [tasks, scopeTasks] = await Promise.all([
     db
       .collection<TaskDoc>("tasks")
-      .find({}, { projection: { _id: 0, status: 1, priority: 1 } })
+      .find({ assigned_to: { $in: owners } }, { projection: { _id: 0, status: 1 } })
       .toArray(),
-    teamDirectory(context),
+    db
+      .collection<TaskDoc>("tasks")
+      .find(
+        { project_id: { $in: scope.map((p) => p.id) } },
+        { projection: { _id: 0, status: 1, priority: 1 } },
+      )
+      .toArray(),
   ]);
-  return { projects, tasks, profiles };
+
+  // Active accounts in your department(s); "Tech & SEO" people first.
+  const inactive = new Set(disabled.map((u) => u.id));
+  const team = people
+    .filter((p) => !inactive.has(p.id) && inDepartments(types, p.department))
+    .sort(
+      (a, b) =>
+        Number(b.department === "Tech & SEO") - Number(a.department === "Tech & SEO") ||
+        (a.full_name ?? "").localeCompare(b.full_name ?? ""),
+    )
+    .map((p) => ({
+      id: p.id,
+      full_name: p.full_name,
+      designation: p.designation,
+      department: p.department,
+      availability: p.availability,
+    }));
+
+  const summary = (p: ProjectDoc) => ({
+    id: p.id,
+    name: p.name,
+    project_type: p.project_type,
+    status: p.status,
+    progress: p.progress,
+    expected_delivery_date: p.expected_delivery_date,
+  });
+  return {
+    isAdmin,
+    projects: projects.map(summary),
+    myProjects: mine.map((p) => ({ ...summary(p), isOwner: p.lead_id === me })),
+    scopeProjects: scope.map(summary),
+    tasks: tasks.map((t) => ({ status: t.status })),
+    scopeTasks: scopeTasks.map((t) => ({ status: t.status, priority: t.priority })),
+    team,
+  };
 }
 
 // ---------- tasks (each person's daily work log) ----------
@@ -281,8 +377,22 @@ async function teamTaskOwners(context: Context, db: Db) {
     .sort({ full_name: 1 })
     .toArray()) as Array<Pick<ProfileDoc, "id" | "full_name" | "designation" | "department">>;
   const viewer = people.find((p) => p.id === context.userId);
+  // Super admins oversee both departments. Admins see their own department only, never super admins.
+  if (await hasAnyRole(context.userId, ["Super_Admin"]))
+    return people.filter((p) => p.id !== context.userId);
+  const supers = new Set(
+    (
+      await db
+        .collection<UserRoleDoc>("user_roles")
+        .find({ role: "Super_Admin" }, { projection: { _id: 0, user_id: 1 } })
+        .toArray()
+    ).map((r) => r.user_id),
+  );
   return people.filter(
-    (p) => p.id !== context.userId && canSeeTasksOf(viewer?.department, p.department),
+    (p) =>
+      p.id !== context.userId &&
+      !supers.has(p.id) &&
+      canSeeTasksOf(viewer?.department, p.department),
   );
 }
 
@@ -347,10 +457,20 @@ function checkTaskDates(start?: string | null, end?: string | null) {
   if (start && end && end < start) throw new Error("End date cannot be before the start date.");
 }
 
+/** Tasks are logged for today only. The browser sends its local date, so allow a day either way for time zones. */
+function checkTaskIsToday(date: string) {
+  const day = 24 * 60 * 60 * 1000;
+  const diff = Math.abs(
+    Date.parse(`${date}T00:00:00Z`) - Date.parse(now().slice(0, 10) + "T00:00:00Z"),
+  );
+  if (!(diff <= day)) throw new Error("Tasks can only be logged for today.");
+}
+
 // Everyone logs their own tasks; nobody adds tasks for someone else.
 export async function createTask(context: Context, input: TaskInput & { project_id: string }) {
   const db = await getDb();
   await checkTaskProject(context, db, input.project_id);
+  checkTaskIsToday(input.task_date);
   checkTaskDates(input.start_date, input.end_date);
   const timestamp = now();
   const task: TaskDoc = {
@@ -378,7 +498,9 @@ async function ownTask(context: Context, db: Db, id: string) {
   return task;
 }
 
-export async function updateTask(context: Context, id: string, changes: Partial<TaskInput>) {
+export async function updateTask(context: Context, id: string, input: Partial<TaskInput>) {
+  // The log date is fixed when the task is added.
+  const { task_date: _date, ...changes } = input;
   const db = await getDb();
   const task = await ownTask(context, db, id);
   if (changes.project_id && changes.project_id !== task.project_id)
@@ -467,9 +589,6 @@ export async function deleteUser(context: Context, targetId: string) {
     db.collection("project_members").deleteMany({ user_id: targetId }),
     db.collection("daily_logs").deleteMany({ user_id: targetId }),
     db.collection("tasks").updateMany({ assigned_to: targetId }, { $set: { assigned_to: null } }),
-    db
-      .collection("project_phases")
-      .updateMany({ assigned_to: targetId }, { $set: { assigned_to: null } }),
     db.collection("projects").updateMany({ lead_id: targetId }, { $set: { lead_id: null } }),
     db.collection("activity_log").updateMany({ actor_id: targetId }, { $set: { actor_id: null } }),
   ]);

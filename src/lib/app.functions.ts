@@ -21,6 +21,22 @@ export const login = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => (await srv()).login(data.email, data.password));
 
+// Only ever the caller's own password (the id comes from the session).
+export const changeMyPassword = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .validator((d: unknown) =>
+    z
+      .object({
+        current_password: z.string().min(1).max(200),
+        new_password: z.string().min(6).max(200),
+      })
+      .strict()
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    (await srv()).changeMyPassword(context, data.current_password, data.new_password),
+  );
+
 export const logout = createServerFn({ method: "POST" }).handler(async () =>
   (await srv()).logout(),
 );

@@ -35,11 +35,20 @@ export const statusColor = (s: string): string => {
 
 export const priorityColor = (p: string): string =>
   ({
-    low: "bg-muted text-muted-foreground",
+    low: "bg-[var(--status-live-background)] text-[var(--status-live-foreground)]",
     medium: "bg-info/10 text-info",
-    high: "bg-warning/15 text-warning-foreground",
+    high: "bg-[var(--status-maintenance-background)] text-[var(--status-maintenance-foreground)]",
     critical: "bg-destructive/10 text-destructive",
   })[p] ?? "bg-muted text-muted-foreground";
+
+/** "high" → "High". */
+export const priorityLabel = (p: string) => p.charAt(0).toUpperCase() + p.slice(1);
+
+/** Department badge: Tech projects green, SEO projects blue. */
+export const projectTypeColor = (type: string): string =>
+  type === "seo"
+    ? "border-info/40 bg-info/10 text-info"
+    : "border-success/40 bg-success/10 text-success";
 
 const AVAILABILITY_LABEL: Record<Availability, string> = {
   available: "Available",

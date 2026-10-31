@@ -72,13 +72,18 @@ function TasksPage() {
         <Tabs defaultValue="mine">
           <TabsList>
             <TabsTrigger value="mine">My Tasks</TabsTrigger>
-            <TabsTrigger value="team">Team Tasks</TabsTrigger>
+            <TabsTrigger value="team">Member Tasks</TabsTrigger>
           </TabsList>
           <TabsContent value="mine" className="space-y-4">
             <MyTasks />
           </TabsContent>
           <TabsContent value="team" className="space-y-4">
-            <TeamTasks department={me?.profile?.department ?? null} />
+            {/* Super admins oversee both departments, whatever their own is. */}
+            <TeamTasks
+              department={
+                me?.role === "Super_Admin" ? "Tech & SEO" : (me?.profile?.department ?? null)
+              }
+            />
           </TabsContent>
         </Tabs>
       ) : (
@@ -172,20 +177,17 @@ function MyTasks() {
 
 function TeamTasks({ department }: { department: string | null }) {
   const [filters, setFilters] = useState(noFilters);
-  const [member, setMember] = useState("all");
+  // One person's log at a time; nothing is shown until someone is picked.
+  const [member, setMember] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["team-tasks"],
     queryFn: () => listTeamTasks(),
   });
   const members = data?.members ?? [];
-  const tasks = applyFilters(data?.tasks ?? [], filters);
-
-  // One section per person, in name order; people with nothing matching are left out.
-  const groups = members
-    .filter((m) => member === "all" || m.id === member)
-    .map((m) => ({ member: m, items: tasks.filter((t) => t.assigned_to === m.id) }))
-    .filter((g) => g.items.length > 0);
+  const selected = members.find((m) => m.id === member);
+  const ownTasks = (data?.tasks ?? []).filter((t) => t.assigned_to === member);
+  const items = applyFilters(ownTasks, filters);
 
   if (!isLoading && !department)
     return (
@@ -200,10 +202,14 @@ function TeamTasks({ department }: { department: string | null }) {
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={member} onValueChange={setMember}>
           <SelectTrigger className="w-full sm:w-56">
-            <SelectValue />
+            <SelectValue placeholder="Choose a member" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All members</SelectItem>
+            {members.length === 0 && (
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                No team members to show yet.
+              </div>
+            )}
             {members.map((m) => (
               <SelectItem key={m.id} value={m.id}>
                 {m.full_name ?? "Team member"}
@@ -220,40 +226,46 @@ function TeamTasks({ department }: { department: string | null }) {
         <Card className="p-6">
           <ListRowsSkeleton rows={4} />
         </Card>
-      ) : groups.length === 0 ? (
+      ) : !selected ? (
         <Card>
           <EmptyTasks
             text={
-              !members.length
-                ? "No team members to show yet."
-                : !data?.tasks.length
-                  ? "Your team has not logged any tasks yet."
-                  : "No tasks match these filters."
+              members.length
+                ? "Please choose a member to see their tasks."
+                : "No team members to show yet."
             }
           />
         </Card>
       ) : (
-        groups.map(({ member: m, items }) => (
-          <Card key={m.id} className="overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                  {initialsOf(m.full_name ?? "U")}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="font-medium truncate">{m.full_name ?? "Team member"}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {[m.designation, m.department].filter(Boolean).join(" · ")}
-                </p>
-              </div>
-              <Badge variant="secondary" className="ml-auto">
-                {items.length} {items.length === 1 ? "task" : "tasks"}
-              </Badge>
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                {initialsOf(selected.full_name ?? "U")}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="font-medium truncate">{selected.full_name ?? "Team member"}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {[selected.designation, selected.department].filter(Boolean).join(" · ")}
+              </p>
             </div>
+            <Badge variant="secondary" className="ml-auto">
+              {items.length} {items.length === 1 ? "task" : "tasks"}
+            </Badge>
+          </div>
+          {items.length === 0 ? (
+            <EmptyTasks
+              text={
+                ownTasks.length
+                  ? "No tasks match these filters."
+                  : `${selected.full_name ?? "This member"} has not logged any tasks yet.`
+              }
+            />
+          ) : (
             <TaskTable tasks={items} />
-          </Card>
-        ))
+          )}
+        </Card>
       )}
     </>
   );
@@ -282,7 +294,7 @@ function TaskFilters({ value, onChange }: { value: Filters; onChange: (f: Filter
           ))}
         </SelectContent>
       </Select>
-      <div className="w-full sm:w-44">
+      <div className="w-full sm:w-56">
         <DatePicker
           value={value.date}
           onChange={(v) => onChange({ ...value, date: v })}

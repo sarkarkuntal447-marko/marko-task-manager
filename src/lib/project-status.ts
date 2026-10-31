@@ -84,16 +84,17 @@ export const canWorkOn = (type: ProjectType, department?: string | null) =>
 
 /**
  * Project types someone may see, by their department: Tech people see Tech projects, SEO people
- * SEO projects, "Tech & SEO" people both. A super admin with no department set sees everything,
- * so the first account is never locked out.
+ * SEO projects, "Tech & SEO" people both. Super admins always see both departments.
  */
 export const visibleProjectTypes = (
   department?: string | null,
   isSuperAdmin = false,
-): ProjectType[] => {
-  const types = PROJECT_TYPES.filter((t) => canWorkOn(t, department));
-  return types.length || !isSuperAdmin ? types : [...PROJECT_TYPES];
-};
+): ProjectType[] =>
+  isSuperAdmin ? [...PROJECT_TYPES] : PROJECT_TYPES.filter((t) => canWorkOn(t, department));
+
+/** True when someone in `department` belongs to a department covered by these project types. */
+export const inDepartments = (types: ProjectType[], department?: string | null) =>
+  types.some((t) => canWorkOn(t, department));
 
 /**
  * Whose tasks an admin may see, by the admin's own department: Tech admins see Tech people,

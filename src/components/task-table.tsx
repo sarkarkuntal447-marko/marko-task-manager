@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Pencil, Trash2 } from "lucide-react";
-import { fmtDate, priorityColor, statusColor, statusLabel } from "@/lib/format";
+import { fmtDate, priorityColor, statusColor, statusLabel, priorityLabel } from "@/lib/format";
 import { TASK_STATUSES, type TaskDoc, type TaskStatus } from "@/lib/types";
 
 export type TaskRow = Pick<
@@ -83,7 +83,7 @@ export function TaskTable({
               <TableCell className="text-sm whitespace-pre-wrap break-words">{t.name}</TableCell>
               <TableCell className="text-center">
                 <Badge variant="secondary" className={priorityColor(t.priority)}>
-                  {statusLabel(t.priority)}
+                  {priorityLabel(t.priority)}
                 </Badge>
               </TableCell>
               <TableCell className="text-center">

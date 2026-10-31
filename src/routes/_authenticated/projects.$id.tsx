@@ -58,7 +58,14 @@ import { toast } from "sonner";
 import { ProjectTimeline } from "@/components/project-timeline";
 import { TaskTable } from "@/components/task-table";
 import { ProjectDetailSkeleton, ListRowsSkeleton } from "@/components/skeletons";
-import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
+import {
+  statusLabel,
+  statusColor,
+  priorityColor,
+  priorityLabel,
+  projectTypeColor,
+  fmtDate,
+} from "@/lib/format";
 import {
   PROJECT_TYPE_LABEL,
   canWorkOn,
@@ -184,6 +191,8 @@ function ProjectDetail() {
       await updateProject({ data: { id, changes } });
       qc.invalidateQueries({ queryKey: ["project", id] });
       qc.invalidateQueries({ queryKey: ["projects"] });
+      // Choosing an owner also adds them to the team on the server.
+      if (changes.lead_id) qc.invalidateQueries({ queryKey: ["project-members", id] });
       toast.success(message);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save project.");
@@ -230,9 +239,11 @@ function ProjectDetail() {
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2 flex-wrap">
             <h1 className="text-2xl sm:text-3xl font-bold break-words min-w-0">{project.name}</h1>
-            <Badge variant="outline">{PROJECT_TYPE_LABEL[projectType]}</Badge>
+            <Badge variant="outline" className={projectTypeColor(projectType)}>
+              {PROJECT_TYPE_LABEL[projectType]}
+            </Badge>
             <Badge variant="secondary" className={priorityColor(project.priority)}>
-              {project.priority}
+              {priorityLabel(project.priority)}
             </Badge>
           </div>
           <p className="text-muted-foreground mt-1 max-w-3xl break-words">{project.description}</p>
@@ -346,7 +357,6 @@ function ProjectDetail() {
                   )}
                   <AddPhaseDialog
                     projectId={id}
-                    members={eligibleMembers}
                     onAdded={() => {
                       qc.invalidateQueries({ queryKey: ["phases", id] });
                       recomputeProgress();
@@ -360,8 +370,6 @@ function ProjectDetail() {
             ) : (
               <div className="space-y-2">
                 {orderedPhases.map((ph) => {
-                  const owner = safeMembers.find((m) => m.id === ph.assigned_to);
-                  const subs = ph.sub_phases ?? [];
                   return (
                     <div
                       key={ph.id}
@@ -385,15 +393,9 @@ function ProjectDetail() {
                               title="Open phase"
                             >
                               {ph.name}
-                              {subs.length > 0 && (
-                                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                  {subs.filter((x) => x.completed).length}/{subs.length} sub-phases
-                                </span>
-                              )}
                             </Link>
                             <p className="text-xs text-muted-foreground break-words">
-                              {owner?.full_name ?? "Unassigned"} · {fmtDate(ph.start_date)} →{" "}
-                              {fmtDate(ph.end_date)}
+                              {fmtDate(ph.start_date)} → {fmtDate(ph.end_date)}
                             </p>
                           </div>
                         </div>
@@ -413,7 +415,6 @@ function ProjectDetail() {
                             <>
                               <EditPhaseDialog
                                 phase={ph}
-                                members={eligibleMembers}
                                 onSaved={() => {
                                   qc.invalidateQueries({ queryKey: ["phases", id] });
                                   recomputeProgress();
@@ -443,7 +444,6 @@ function ProjectDetail() {
             <ProjectTimeline
               project={project}
               phases={safePhases}
-              members={safeMembers}
               canEdit={!!canManage}
               onOpenPhase={(phaseId) =>
                 navigate({ to: "/projects/$id/phases/$phaseId", params: { id, phaseId } })
@@ -507,7 +507,8 @@ function ProjectDetail() {
               <h3 className="font-semibold flex items-center gap-2">
                 <Users className="h-4 w-4" /> Currently Working On
               </h3>
-              {canManage && (
+              {/* Team members manage this list too; only admins choose the owner above. */}
+              {canEditProject && (
                 <AssignMembersDialog
                   projectId={id}
                   department={PROJECT_TYPE_LABEL[projectType]}
@@ -542,11 +543,15 @@ function ProjectDetail() {
                           {m.designation ?? ""}
                         </p>
                       </div>
-                      {canManage && (
+                      {canEditProject && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="Remove"
+                          // The owner stays on the team until someone else is made owner.
+                          disabled={isSto}
+                          title={
+                            isSto ? "Single-threaded owner — change the owner to remove" : "Remove"
+                          }
                           onClick={async () => {
                             try {
                               await removeProjectMember({ data: { projectId: id, userId: m.id } });
@@ -843,7 +848,7 @@ function EditProjectDialog({ project, onSaved }: { project: ProjectDoc; onSaved:
               <SelectContent>
                 {PRIORITIES.map((p) => (
                   <SelectItem key={p} value={p}>
-                    {statusLabel(p)}
+                    {priorityLabel(p)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -867,19 +872,10 @@ function EditProjectDialog({ project, onSaved }: { project: ProjectDoc; onSaved:
   );
 }
 
-function AddPhaseDialog({
-  projectId,
-  members,
-  onAdded,
-}: {
-  projectId: string;
-  members: TeamMember[];
-  onAdded: () => void;
-}) {
+function AddPhaseDialog({ projectId, onAdded }: { projectId: string; onAdded: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
-    assigned_to: "",
     start_date: "",
     end_date: "",
     status: "not_started",
@@ -892,7 +888,6 @@ function AddPhaseDialog({
           projectId,
           phase: {
             name: form.name,
-            assigned_to: form.assigned_to || null,
             start_date: form.start_date || null,
             end_date: form.end_date || null,
             status: form.status as PhaseStatus,
@@ -907,7 +902,6 @@ function AddPhaseDialog({
       setOpen(false);
       setForm({
         name: "",
-        assigned_to: "",
         start_date: "",
         end_date: "",
         status: "not_started",
@@ -932,24 +926,6 @@ function AddPhaseDialog({
           <div className="space-y-2">
             <Label>Phase name *</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Assign to</Label>
-            <Select
-              value={form.assigned_to}
-              onValueChange={(v) => setForm({ ...form, assigned_to: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose member" />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.full_name ?? m.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -1000,19 +976,10 @@ function AddPhaseDialog({
   );
 }
 
-function EditPhaseDialog({
-  phase,
-  members,
-  onSaved,
-}: {
-  phase: PhaseDoc;
-  members: TeamMember[];
-  onSaved: () => void;
-}) {
+function EditPhaseDialog({ phase, onSaved }: { phase: PhaseDoc; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: phase.name ?? "",
-    assigned_to: phase.assigned_to ?? "",
     start_date: phase.start_date ?? "",
     end_date: phase.end_date ?? "",
     status: phase.status ?? "not_started",
@@ -1026,7 +993,6 @@ function EditPhaseDialog({
           phaseId: phase.id,
           changes: {
             name: form.name,
-            assigned_to: form.assigned_to || null,
             start_date: form.start_date || null,
             end_date: form.end_date || null,
             status: form.status as PhaseStatus,
@@ -1057,24 +1023,6 @@ function EditPhaseDialog({
           <div className="space-y-2">
             <Label>Phase name *</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Assign to</Label>
-            <Select
-              value={form.assigned_to}
-              onValueChange={(v) => setForm({ ...form, assigned_to: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose member" />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.full_name ?? m.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

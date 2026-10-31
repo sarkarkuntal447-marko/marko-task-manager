@@ -33,6 +33,7 @@ import {
   availabilityLabel,
   fmtDate,
   todayStr,
+  priorityLabel,
 } from "@/lib/format";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { AvailabilityIcon } from "@/components/availability-status";
@@ -62,7 +63,6 @@ function MemberDetail() {
 
   const today = todayStr();
   const todaysTasks = tasks.filter((t) => t.task_date === today);
-  const previousTasks = tasks.filter((t) => !todaysTasks.includes(t));
 
   const working = projects.filter((p) => memberships.includes(p.id) || p.lead_id === id);
   const ownsAsSto = projects.filter((p) => p.lead_id === id);
@@ -126,44 +126,26 @@ function MemberDetail() {
 
       {/* Tasks are private to the member and the admins of their department. */}
       {detail?.canSeeTasks && (
-        <div className="grid lg:grid-cols-2 gap-4">
-          <Card className="p-4 sm:p-6 border-primary/40 bg-primary/[0.04]">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="font-semibold">Today's Tasks · {fmtDate(today)}</h2>
-              <Badge variant="secondary">{todaysTasks.length}</Badge>
+        <Card className="p-4 sm:p-6 border-primary/40 bg-primary/[0.04]">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="font-semibold">Today's Tasks · {fmtDate(today)}</h2>
+            <Badge variant="secondary">{todaysTasks.length}</Badge>
+          </div>
+          {todaysTasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No tasks for today.</p>
+          ) : (
+            <div className="space-y-2">
+              {todaysTasks.map((t) => (
+                <TaskLine key={t.id} t={t} />
+              ))}
             </div>
-            {todaysTasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No tasks for today.</p>
-            ) : (
-              <div className="space-y-2">
-                {todaysTasks.map((t) => (
-                  <TaskLine key={t.id} t={t} />
-                ))}
-              </div>
-            )}
-          </Card>
-
-          <Card className="p-4 sm:p-6">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="font-semibold">Previous Tasks</h2>
-              <Badge variant="secondary">{previousTasks.length}</Badge>
-            </div>
-            {previousTasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No prior tasks.</p>
-            ) : (
-              <div className="space-y-2 max-h-96 overflow-auto overscroll-contain pr-1">
-                {previousTasks.map((t) => (
-                  <TaskLine key={t.id} t={t} />
-                ))}
-              </div>
-            )}
-          </Card>
-        </div>
+          )}
+        </Card>
       )}
 
       <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
         <ProjectList
-          title="Currently working on"
+          title="Accessible Projects"
           icon={<Briefcase className="h-4 w-4" />}
           projects={working}
           stoIds={ownsAsSto.map((p) => p.id)}
@@ -298,7 +280,7 @@ function TaskLine({
         </p>
       </div>
       <Badge variant="secondary" className={priorityColor(t.priority)}>
-        {statusLabel(t.priority)}
+        {priorityLabel(t.priority)}
       </Badge>
       <Badge variant="secondary" className={statusColor(t.status)}>
         {statusLabel(t.status)}

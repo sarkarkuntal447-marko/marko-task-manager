@@ -37,7 +37,14 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { Plus, FolderKanban, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import { statusLabel, statusColor, priorityColor, fmtDate } from "@/lib/format";
+import {
+  statusLabel,
+  statusColor,
+  priorityColor,
+  priorityLabel,
+  projectTypeColor,
+  fmtDate,
+} from "@/lib/format";
 import {
   PROJECT_TYPE_LABEL,
   isActive,
@@ -233,11 +240,13 @@ function ProjectsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="outline">{PROJECT_TYPE_LABEL[projectTypeOf(p)]}</Badge>
+                      <Badge variant="outline" className={projectTypeColor(projectTypeOf(p))}>
+                        {PROJECT_TYPE_LABEL[projectTypeOf(p)]}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary" className={priorityColor(p.priority)}>
-                        {p.priority}
+                        {priorityLabel(p.priority)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
@@ -372,7 +381,7 @@ function NewProjectDialog({
             <SelectContent>
               {PRIORITIES.map((p) => (
                 <SelectItem key={p} value={p}>
-                  {statusLabel(p)}
+                  {priorityLabel(p)}
                 </SelectItem>
               ))}
             </SelectContent>

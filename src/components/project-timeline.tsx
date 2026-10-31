@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Check, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import { updateProject, updateProjectPhase } from "@/lib/projects.functions";
-import { getTeamDirectory } from "@/lib/app.functions";
 import type { PhaseDoc, ProjectDoc } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { statusLabel, fmtDate } from "@/lib/format";
@@ -42,7 +41,7 @@ const ROW = 38; // row height
 
 type Row = {
   key: string;
-  kind: "project" | "phase" | "sub";
+  kind: "project" | "phase";
   depth: number;
   label: string;
   sublabel?: string;
@@ -68,14 +67,12 @@ function colors(r: Row) {
 export function ProjectTimeline({
   project,
   phases,
-  members,
   canEdit,
   onOpenPhase,
   onChanged,
 }: {
   project: ProjectDoc;
   phases: PhaseDoc[];
-  members: Awaited<ReturnType<typeof getTeamDirectory>>;
   canEdit: boolean;
   onOpenPhase: (phaseId: string) => void;
   onChanged: () => void;
@@ -95,10 +92,9 @@ export function ProjectTimeline({
   const px = PX[zoom];
   const today = todayDay();
 
-  // ---------- build rows: project > phases > sub-phases ----------
+  // ---------- build rows: project > phases ----------
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
-    const owner = (id?: string | null) => members.find((m) => m.id === id)?.full_name;
     const pStart = project.start_date ? toDay(project.start_date) : null;
     const pEnd = project.expected_delivery_date
       ? toDay(project.expected_delivery_date)
@@ -122,7 +118,6 @@ export function ProjectTimeline({
     });
     if (collapsed.has("project")) return out;
     for (const ph of phases) {
-      const subs = ph.sub_phases ?? [];
       const s = ph.start_date ? toDay(ph.start_date) : null,
         e = ph.end_date ? toDay(ph.end_date) : null;
       const done = !!ph.completed;
@@ -131,43 +126,18 @@ export function ProjectTimeline({
         kind: "phase",
         depth: 1,
         label: ph.name,
-        sublabel: [statusLabel(ph.status), owner(ph.assigned_to)].filter(Boolean).join(" · "),
+        sublabel: statusLabel(ph.status),
         start: s ?? e,
         end: e ?? s,
         status: ph.status,
         done,
         phaseId: ph.id,
-        progress: done
-          ? 100
-          : subs.length
-            ? Math.round((subs.filter((x) => x.completed).length / subs.length) * 100)
-            : ph.status === "in_progress"
-              ? 50
-              : 0,
+        progress: done ? 100 : ph.status === "in_progress" ? 50 : 0,
         overdue: !done && e != null && e < today,
-        collapsibleKey: subs.length ? `phase:${ph.id}` : undefined,
       });
-      if (collapsed.has(`phase:${ph.id}`)) continue;
-      for (const sp of subs) {
-        const ss = sp.start_date ? toDay(sp.start_date) : null,
-          se = sp.end_date ? toDay(sp.end_date) : null;
-        out.push({
-          key: `sub:${sp.id}`,
-          kind: "sub",
-          depth: 2,
-          label: sp.name,
-          start: ss ?? se,
-          end: se ?? ss,
-          progress: sp.completed ? 100 : 0,
-          status: sp.completed ? "completed" : "pending",
-          done: !!sp.completed,
-          overdue: !sp.completed && se != null && se < today,
-          phaseId: ph.id,
-        });
-      }
     }
     return out;
-  }, [project, phases, members, collapsed, today]);
+  }, [project, phases, collapsed, today]);
 
   const effective = (r: Row) => {
     if (drag && drag.key === r.key) {
@@ -317,9 +287,6 @@ export function ProjectTimeline({
       else n.add(k);
       return n;
     });
-  const allParents = phases
-    .filter((ph) => (ph.sub_phases ?? []).length)
-    .map((ph) => `phase:${ph.id}`);
   const canSpread =
     canEdit && phases.length > 0 && project.start_date && project.expected_delivery_date;
 
@@ -341,12 +308,6 @@ export function ProjectTimeline({
         </div>
         <Button variant="outline" size="sm" onClick={goToday}>
           Today
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set())}>
-          Expand all
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set(allParents))}>
-          Collapse all
         </Button>
         {canSpread && (
           <Button
@@ -455,11 +416,6 @@ export function ProjectTimeline({
                     ) : (
                       <span className="w-4 shrink-0" />
                     )}
-                    {r.kind === "sub" && (
-                      <Check
-                        className={`h-3.5 w-3.5 shrink-0 ${r.done ? "text-success" : "text-muted-foreground/40"}`}
-                      />
-                    )}
                     <div className="min-w-0 flex-1">
                       {r.kind === "phase" ? (
                         <button
@@ -472,13 +428,13 @@ export function ProjectTimeline({
                         </button>
                       ) : (
                         <p
-                          className={`truncate text-sm ${r.kind === "project" ? "font-semibold" : r.kind === "sub" ? "text-muted-foreground" : ""} ${r.done && r.kind !== "project" ? "line-through text-muted-foreground" : ""}`}
+                          className={`truncate text-sm ${r.kind === "project" ? "font-semibold" : ""} ${r.done && r.kind !== "project" ? "line-through text-muted-foreground" : ""}`}
                           title={r.label}
                         >
                           {r.label}
                         </p>
                       )}
-                      {r.sublabel && r.kind !== "sub" && (
+                      {r.sublabel && (
                         <p className="text-[11px] text-muted-foreground truncate leading-tight">
                           {r.sublabel}
                         </p>
@@ -529,7 +485,7 @@ export function ProjectTimeline({
                     style={{ top: i * ROW, height: ROW }}
                     onClick={(e) => createBar(e, r)}
                   >
-                    {hasDates && (isBar || r.kind === "sub") && (
+                    {hasDates && isBar && (
                       <div
                         className={`absolute top-[7px] rounded-md overflow-hidden group ${c.track} ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${r.kind === "project" ? "h-6 ring-1 ring-foreground/20" : "h-6"}`}
                         style={{
