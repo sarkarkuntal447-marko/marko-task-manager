@@ -42,6 +42,7 @@ import { PRIORITIES } from "@/lib/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AvailabilityIcon, WithStatus } from "@/components/availability-status";
 import { MetricCardSkeleton, ChartCardSkeleton, ListRowsSkeleton } from "@/components/skeletons";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Marko Projects" }] }),
@@ -53,6 +54,9 @@ function DashboardPage() {
     queryKey: ["dashboard"],
     queryFn: () => getDashboard(),
   });
+  const { data: me } = useCurrentUser();
+  // Super admins don't sit on project teams, so they get a full-width Team Status instead.
+  const isSuperAdmin = me?.role === "Super_Admin";
 
   const isAdmin = !!data?.isAdmin;
   const projects = data?.projects ?? [];
@@ -185,10 +189,14 @@ function DashboardPage() {
         )}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-3 sm:gap-4">
-        <TeamStatus team={team} loading={isLoading} />
-        <AccessibleProjects projects={data?.myProjects ?? []} loading={isLoading} />
-      </div>
+      {isSuperAdmin ? (
+        <TeamStatus team={team} loading={isLoading} wide />
+      ) : (
+        <div className="grid lg:grid-cols-2 gap-3 sm:gap-4">
+          <TeamStatus team={team} loading={isLoading} />
+          <AccessibleProjects projects={data?.myProjects ?? []} loading={isLoading} />
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-3 sm:gap-4">
         {isLoading ? (
@@ -409,8 +417,16 @@ function EmptyChart({ label }: { label: string }) {
 type TeamMember = Awaited<ReturnType<typeof getDashboard>>["team"][number];
 type MyProject = Awaited<ReturnType<typeof getDashboard>>["myProjects"][number];
 
-/** Active members of your department(s) and what they're up to right now. */
-function TeamStatus({ team, loading }: { team: TeamMember[]; loading: boolean }) {
+/** Active members of your department(s) and what they're up to right now. `wide` shows two per row. */
+function TeamStatus({
+  team,
+  loading,
+  wide = false,
+}: {
+  team: TeamMember[];
+  loading: boolean;
+  wide?: boolean;
+}) {
   return (
     <Card className="p-4 sm:p-6 flex flex-col">
       <div className="flex items-center justify-between mb-4">
@@ -427,7 +443,9 @@ function TeamStatus({ team, loading }: { team: TeamMember[]; loading: boolean })
       ) : team.length === 0 ? (
         <p className="text-sm text-muted-foreground">No team members in your department yet.</p>
       ) : (
-        <div className="space-y-1 max-h-72 overflow-auto overscroll-contain -mx-2 px-2">
+        <div
+          className={`${wide ? "grid md:grid-cols-2 gap-x-8 gap-y-1" : "space-y-1"} max-h-72 overflow-auto overscroll-contain -mx-2 px-2`}
+        >
           {team.map((m) => (
             <Link
               key={m.id}
