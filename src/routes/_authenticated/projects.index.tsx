@@ -397,9 +397,9 @@ function NewProjectDialog({
               expected_delivery_date: form.expected_delivery_date || null,
               technology_stack: form.technology_stack
                 ? form.technology_stack
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean)
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
                 : null,
             })
           }

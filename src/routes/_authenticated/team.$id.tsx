@@ -239,10 +239,7 @@ function EditMemberDialog({ member }: { member: Member }) {
           </div>
           <div className="space-y-2">
             <Label>Department</Label>
-            <Input
-              value={form.department}
-              onChange={(e) => update("department", e.target.value)}
-            />
+            <Input value={form.department} onChange={(e) => update("department", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Phone</Label>
@@ -250,10 +247,7 @@ function EditMemberDialog({ member }: { member: Member }) {
           </div>
         </div>
         <DialogFooter>
-          <Button
-            disabled={!form.full_name.trim() || save.isPending}
-            onClick={() => save.mutate()}
-          >
+          <Button disabled={!form.full_name.trim() || save.isPending} onClick={() => save.mutate()}>
             {save.isPending ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>

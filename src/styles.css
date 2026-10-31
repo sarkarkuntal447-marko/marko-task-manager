@@ -332,7 +332,7 @@
     text-transform: uppercase;
   }
 
-  .workspace-nav-group+.workspace-nav-group {
+  .workspace-nav-group + .workspace-nav-group {
     margin-top: 2.5rem;
   }
 
@@ -372,7 +372,8 @@
     font-weight: 600;
   }
 
-  .workspace-nav-item:is(.active, [aria-current="page"], [data-active="true"]) .workspace-nav-count {
+  .workspace-nav-item:is(.active, [aria-current="page"], [data-active="true"])
+    .workspace-nav-count {
     color: inherit;
   }
 
@@ -523,7 +524,7 @@
       padding: 1rem;
     }
 
-    .workspace-nav-group+.workspace-nav-group {
+    .workspace-nav-group + .workspace-nav-group {
       margin-top: 1.25rem;
     }
 
